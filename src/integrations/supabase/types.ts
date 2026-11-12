@@ -25,6 +25,8 @@ export type Database = {
           procedures: string
           questions: string
           send_handoff_message: boolean
+          test_mode: boolean
+          test_numbers: string
           tone: string
           updated_at: string
         }
@@ -38,6 +40,8 @@ export type Database = {
           procedures?: string
           questions?: string
           send_handoff_message?: boolean
+          test_mode?: boolean
+          test_numbers?: string
           tone?: string
           updated_at?: string
         }
@@ -51,6 +55,8 @@ export type Database = {
           procedures?: string
           questions?: string
           send_handoff_message?: boolean
+          test_mode?: boolean
+          test_numbers?: string
           tone?: string
           updated_at?: string
         }

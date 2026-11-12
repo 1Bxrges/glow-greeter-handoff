@@ -3,6 +3,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/integrations/supabase/types";
 import { runSecretary } from "./ai-secretary.server";
 import { sendWhatsAppText } from "./whatsapp.server";
+import { aiAllowedFor } from "./rules/test-mode";
 
 type DB = SupabaseClient<Database>;
 const STATUS_RANK: Record<string, number> = { accepted: 0, sent: 1, delivered: 2, read: 3, failed: 4 };
@@ -82,8 +83,16 @@ async function handleEchoes(db: DB, value: any) {
 async function handleInbound(db: DB, value: any) {
   const names = new Map<string, string>();
   for (const c of value.contacts ?? []) if (c.wa_id && c.profile?.name) names.set(c.wa_id, c.profile.name);
+  const { data: settings, error: setErr } = await db.from("clinic_settings").select("test_mode, test_numbers").eq("id", 1).single();
+  if (setErr) throw setErr;
   for (const m of value.messages ?? []) {
-    const conv = await upsertConversation(db, m.from, names.get(m.from) ?? null);
+    let conv = await upsertConversation(db, m.from, names.get(m.from) ?? null);
+    // Test mode: other numbers are left to the team, silently.
+    if (conv.mode === "ia" && !aiAllowedFor(m.from, settings.test_mode, settings.test_numbers)) {
+      const { error } = await db.from("conversations").update({ mode: "humano" }).eq("id", conv.id);
+      if (error) throw error;
+      conv = { ...conv, mode: "humano" };
+    }
     const body = textOf(m);
     const created = m.timestamp ? new Date(Number(m.timestamp) * 1000).toISOString() : new Date().toISOString();
     const wantsReply = conv.mode === "ia" ? "pending" : "none";
@@ -130,6 +139,7 @@ export async function processReply(db: DB, messageId: string) {
   if (cErr) throw cErr;
   if (sErr) throw sErr;
   if (conv.mode !== "ia" || !settings.ai_enabled) return finish("skipped");
+  if (!aiAllowedFor(conv.wa_phone, settings.test_mode, settings.test_numbers)) return finish("skipped");
 
   // A newer lead message will be answered with the full context instead.
   const { data: newer } = await db

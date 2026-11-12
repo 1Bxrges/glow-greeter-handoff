@@ -8,6 +8,13 @@
       "when": 1794515332685,
       "tag": "0000_secretaria_ia",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1794516655193,
+      "tag": "0001_test_mode",
+      "breakpoints": true
     }
   ]
 }

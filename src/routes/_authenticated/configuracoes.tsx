@@ -86,6 +86,19 @@ function SettingsForm() {
       </Card>
 
       <Card>
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="font-semibold">Modo teste</p>
+            <p className="text-sm text-muted-foreground">A IA responde só os números abaixo. As outras pessoas ficam com você, sem resposta automática.</p>
+          </div>
+          <Switch checked={form.test_mode} onCheckedChange={(v) => set("test_mode", v)} />
+        </div>
+        {form.test_mode && (
+          <F label="Números de teste (um por linha, com DDD)"><Textarea rows={2} value={form.test_numbers} onChange={(e) => set("test_numbers", e.target.value)} /></F>
+        )}
+      </Card>
+
+      <Card>
         <div className="grid gap-4 sm:grid-cols-2">
           <F label="Nome da clínica"><Input value={form.clinic_name} onChange={(e) => set("clinic_name", e.target.value)} /></F>
           <F label="Nome da secretária"><Input value={form.assistant_name} onChange={(e) => set("assistant_name", e.target.value)} /></F>
