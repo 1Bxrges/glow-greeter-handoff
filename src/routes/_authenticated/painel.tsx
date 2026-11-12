@@ -12,7 +12,7 @@ import { cn } from "@/lib/utils";
 import { TopBar } from "@/components/panel/TopBar";
 import { NoAccess, useIsStaff } from "@/components/panel/useStaff";
 import { MODE_META, beep, formatPhone, timeAgo, type Mode } from "@/components/panel/status";
-import { sendHumanReply } from "@/lib/panel.functions";
+import { runFollowups, sendHumanReply } from "@/lib/panel.functions";
 
 type Conversation = Database["public"]["Tables"]["conversations"]["Row"];
 type Message = Database["public"]["Tables"]["messages"]["Row"];
@@ -55,6 +55,15 @@ function Panel() {
   const [filter, setFilter] = useState<"todas" | Mode>("todas");
   const [, tick] = useState(0);
   const prevWaiting = useRef<Set<string> | null>(null);
+  const followups = useServerFn(runFollowups);
+
+  // While the panel is open, check once a minute for leads waiting too long (the "wait" message).
+  useEffect(() => {
+    const run = () => { followups().catch(() => {}); };
+    run();
+    const t = setInterval(run, 60_000);
+    return () => clearInterval(t);
+  }, [followups]);
 
   const convs = useQuery({
     queryKey: ["conversations"],

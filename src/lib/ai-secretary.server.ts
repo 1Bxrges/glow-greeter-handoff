@@ -21,10 +21,15 @@ const schema = z.object({
   procedure: z.string().nullable(),
   experience: z.string().nullable(),
   goal: z.string().nullable(),
+  // Number (1-based) of a recorded audio to send after the text, or null.
+  audio: z.number().int().nullable(),
 });
 export type AiDecision = z.infer<typeof schema>;
 
+export type AudioOption = { title: string; use_when: string };
+
 export async function runSecretary(opts: {
+  audios?: AudioOption[];
   settings: Settings;
   history: { sender: "lead" | "ia" | "humano"; body: string }[];
   aiRepliesSoFar: number;
@@ -35,6 +40,16 @@ export async function runSecretary(opts: {
   if (!apiKey) throw new Error("LOVABLE_API_KEY ausente");
   const { settings: s } = opts;
   const finalTurn = opts.aiRepliesSoFar >= opts.maxAiReplies;
+  const audios = opts.audios ?? [];
+  const audioBlock = audios.length
+    ? `
+Áudios gravados pela doutora que você pode enviar (o áudio vai logo depois do seu texto):
+${audios.map((a, i) => `${i + 1}. "${a.title}" — quando usar: ${a.use_when || "quando combinar com o momento da conversa"}`).join("\n")}
+- Para enviar, coloque o número do áudio em audio. Envie no máximo um por mensagem, só quando o momento combinar com "quando usar".
+- Nunca repita um áudio que já aparece no histórico como "🎙️ Áudio enviado".
+- Quando enviar um áudio, seu texto deve ser curto e não repetir o que o áudio já diz.
+`
+    : "";
 
   const instructions = `Você é ${s.assistant_name}, a secretária virtual da ${s.clinic_name}, uma clínica de estética, falando pelo WhatsApp em português do Brasil.
 Seu ÚNICO papel é o primeiro contato: acolher o lead rápido para ele não esfriar, entender o interesse e passar para a especialista. Você NÃO vende, NÃO informa preços, NÃO agenda e NÃO dá orientação médica.
@@ -47,6 +62,7 @@ ${s.procedures}
 Perguntas gerais (antes da pergunta específica):
 ${s.questions}
 
+${audioBlock}
 Ordem da conversa (UMA pergunta por mensagem, sempre comentando com simpatia a resposta anterior, ex.: "Que bacana!"):
 1. Cumprimente${opts.contactName ? ` (o nome do lead é ${opts.contactName})` : ""} e confirme o procedimento de interesse.
 2. Pergunte se é a primeira vez ou se já fez antes (e as outras perguntas gerais).
@@ -62,7 +78,8 @@ Regras:
 - Marque handoff=true (e explique em handoff_reason) se o lead pedir preço/valores, pedir para falar com uma pessoa, quiser agendar, pedir indicação ou avaliação médica ("você me recomenda?"), trouxer dúvida de saúde, reclamar, ou se o assunto não for estética. Também quando as etapas 1 a 3 estiverem concluídas e não houver mais dúvidas.
 ${finalTurn ? "- ESTA É A ÚLTIMA MENSAGEM: marque handoff=true com handoff_reason='Qualificação concluída'. Em reply, apenas agradeça brevemente." : ""}
 - Em goal, inclua também a região ou detalhes citados e se mandou foto.
-- Extraia do histórico: procedure (procedimento de interesse), experience (se já fez antes), goal (o que busca). Use null quando não souber.`;
+- Extraia do histórico: procedure (procedimento de interesse), experience (se já fez antes), goal (o que busca). Use null quando não souber.
+- Em audio use null quando não for enviar áudio${audios.length ? "" : " (não há áudios cadastrados, use sempre null)"}.`;
 
   const messages: ModelMessage[] = opts.history
     .filter((m) => m.body.trim())
@@ -97,5 +114,6 @@ ${finalTurn ? "- ESTA É A ÚLTIMA MENSAGEM: marque handoff=true com handoff_rea
   });
   const out = await result.output;
   if (finalTurn) out.handoff = true;
+  if (out.audio != null && (out.audio < 1 || out.audio > audios.length)) out.audio = null;
   return out;
 }

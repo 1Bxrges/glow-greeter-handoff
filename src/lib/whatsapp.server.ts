@@ -5,25 +5,26 @@ export type SendResult =
   | { ok: true; waMessageId: string }
   | { ok: false; definite: boolean; error: string };
 
-export async function sendWhatsAppText(to: string, body: string): Promise<SendResult> {
+function gatewayHeaders() {
   const lovableKey = process.env['LOVABLE_API_KEY'];
   const waKey = process.env['WHATSAPP_API_KEY'];
-  if (!lovableKey || !waKey) return { ok: false, definite: true, error: "WhatsApp não configurado" };
+  if (!lovableKey || !waKey) return null;
+  return {
+    Authorization: `Bearer ${lovableKey}`,
+    "X-Connection-Api-Key": waKey,
+    "Content-Type": "application/json",
+  };
+}
+
+async function sendMessage(to: string, content: Record<string, unknown>): Promise<SendResult> {
+  const headers = gatewayHeaders();
+  if (!headers) return { ok: false, definite: true, error: "WhatsApp não configurado" };
   let response: Response;
   try {
     response = await fetch(`${GATEWAY_URL}/messages`, {
       method: "POST",
-      headers: {
-        Authorization: `Bearer ${lovableKey}`,
-        "X-Connection-Api-Key": waKey,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        messaging_product: "whatsapp",
-        to: to.replace(/\D/g, ""),
-        type: "text",
-        text: { body },
-      }),
+      headers,
+      body: JSON.stringify({ messaging_product: "whatsapp", to: to.replace(/\D/g, ""), ...content }),
     });
   } catch (e) {
     // Network failure: we can't know whether Meta accepted it.
@@ -39,4 +40,35 @@ export async function sendWhatsAppText(to: string, body: string): Promise<SendRe
     if (id) return { ok: true, waMessageId: id };
   } catch {}
   return { ok: false, definite: false, error: `Resposta inesperada: ${text.slice(0, 300)}` };
+}
+
+export function sendWhatsAppText(to: string, body: string): Promise<SendResult> {
+  return sendMessage(to, { type: "text", text: { body } });
+}
+
+/** Sends an audio by public link. OGG/Opus files go out as a voice note. */
+export function sendWhatsAppAudio(to: string, link: string, mimeType: string): Promise<SendResult> {
+  const voice = mimeType.includes("ogg") || mimeType.includes("opus");
+  return sendMessage(to, { type: "audio", audio: voice ? { link, voice: true } : { link } });
+}
+
+/** Best effort: marks the lead's message as read and shows "digitando…" while the reply is prepared. */
+export async function showTyping(waMessageId: string): Promise<void> {
+  const headers = gatewayHeaders();
+  if (!headers) return;
+  try {
+    const res = await fetch(`${GATEWAY_URL}/messages`, {
+      method: "POST",
+      headers,
+      body: JSON.stringify({
+        messaging_product: "whatsapp",
+        status: "read",
+        message_id: waMessageId,
+        typing_indicator: { type: "text" },
+      }),
+    });
+    if (!res.ok) console.warn(`typing indicator not accepted [${res.status}]`);
+  } catch (e) {
+    console.warn("typing indicator failed", e);
+  }
 }
