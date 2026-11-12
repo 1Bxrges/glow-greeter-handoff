@@ -176,34 +176,41 @@ export async function processReply(db: DB, messageId: string) {
     text = settings.send_handoff_message ? settings.handoff_message : "";
   }
 
+  // Record progress before sending so an interrupted run never loses the conversation state.
+  const { error: preErr } = await db
+    .from("conversations")
+    .update({
+      ...summary,
+      ai_replies: conv.ai_replies + (decision.handoff ? 0 : 1),
+      ...(decision.handoff
+        ? { mode: "aguardando_humano", handoff_reason: decision.handoff_reason ?? "Qualificação concluída", handoff_at: new Date().toISOString() }
+        : {}),
+    })
+    .eq("id", conv.id);
+  if (preErr) throw preErr;
+
   if (text) {
+    const { data: outRow, error: outErr } = await db
+      .from("messages")
+      .insert({ conversation_id: conv.id, direction: "out", sender: "ia", body: text, status: "sending" })
+      .select("id")
+      .single();
+    if (outErr) throw outErr;
+    await finish("sent_pending");
     const sent = await sendWhatsAppText(conv.wa_phone, text);
     if (!sent.ok) {
-      if (sent.definite) {
-        await db.from("conversations").update({ mode: "aguardando_humano", handoff_reason: "Falha ao enviar resposta da IA", handoff_at: new Date().toISOString(), ...summary }).eq("id", conv.id);
-        return finish("failed", sent.error);
-      }
-      // Ambiguous: never resend blindly. Flag for the team.
-      await db.from("conversations").update({ mode: "aguardando_humano", handoff_reason: "Envio da IA incerto, confira", handoff_at: new Date().toISOString(), ...summary }).eq("id", conv.id);
-      return finish("unknown", sent.error);
+      await db.from("messages").update({ status: sent.definite ? "failed" : "unknown", error: sent.error }).eq("id", outRow.id);
+      await db.from("conversations").update({ mode: "aguardando_humano", handoff_reason: sent.definite ? "Falha ao enviar resposta da IA" : "Envio da IA incerto, confira", handoff_at: new Date().toISOString() }).eq("id", conv.id);
+      return finish(sent.definite ? "failed_send" : "unknown", sent.error);
     }
-    const { error: insErr } = await db.from("messages").insert({
-      conversation_id: conv.id, direction: "out", sender: "ia", body: text, wa_message_id: sent.waMessageId, status: "accepted",
-    });
-    if (insErr) throw insErr;
+    const { error: idErr } = await db.from("messages").update({ wa_message_id: sent.waMessageId, status: "accepted" }).eq("id", outRow.id);
+    if (idErr) throw idErr;
     await applyStatuses(db, sent.waMessageId);
   }
 
   const { error: upErr } = await db
     .from("conversations")
-    .update({
-      ...summary,
-      ai_replies: conv.ai_replies + (decision.handoff ? 0 : 1),
-      ...(text ? { last_message_at: new Date().toISOString(), last_message_preview: text.slice(0, 140) } : {}),
-      ...(decision.handoff
-        ? { mode: "aguardando_humano", handoff_reason: decision.handoff_reason ?? "Qualificação concluída", handoff_at: new Date().toISOString() }
-        : {}),
-    })
+    .update(text ? { last_message_at: new Date().toISOString(), last_message_preview: text.slice(0, 140) } : {})
     .eq("id", conv.id);
   if (upErr) throw upErr;
   await finish("done");
