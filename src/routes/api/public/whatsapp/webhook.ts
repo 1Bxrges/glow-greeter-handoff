@@ -40,13 +40,14 @@ export const Route = createFileRoute("/api/public/whatsapp/webhook")({
         if (error || !row) return new Response("Storage error", { status: 500 });
         if (row.processed_at) return new Response("ok");
 
-        const ok = await processStoredEvent(db, row);
-        try {
+        // The event is durably stored: answer the gateway right away (it cancels requests
+        // after ~5s) and let the AI reply run after the response.
+        const { runInBackground } = await import("@/lib/request-context.server");
+        await runInBackground(async () => {
+          await processStoredEvent(db, row);
           await recoverPending(db, row.id);
-        } catch (e) {
-          console.error("recovery failed", e);
-        }
-        return ok ? new Response("ok") : new Response("Processing error", { status: 500 });
+        });
+        return new Response("ok");
       },
     },
   },
