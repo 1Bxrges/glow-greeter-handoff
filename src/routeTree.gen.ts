@@ -10,33 +10,97 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
+import { Route as AuthRouteImport } from './routes/auth'
+import { Route as AuthenticatedConfiguracoesRouteImport } from './routes/_authenticated/configuracoes'
+import { Route as AuthenticatedPainelRouteImport } from './routes/_authenticated/painel'
+import { Route as ApiPublicWhatsappWebhookRouteImport } from './routes/api/public/whatsapp/webhook'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AuthenticatedRouteRoute = AuthenticatedRouteRouteImport.update({
+  id: '/_authenticated',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AuthRoute = AuthRouteImport.update({
+  id: '/auth',
+  path: '/auth',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AuthenticatedConfiguracoesRoute =
+  AuthenticatedConfiguracoesRouteImport.update({
+    id: '/configuracoes',
+    path: '/configuracoes',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const AuthenticatedPainelRoute = AuthenticatedPainelRouteImport.update({
+  id: '/painel',
+  path: '/painel',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+const ApiPublicWhatsappWebhookRoute =
+  ApiPublicWhatsappWebhookRouteImport.update({
+    id: '/api/public/whatsapp/webhook',
+    path: '/api/public/whatsapp/webhook',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/auth': typeof AuthRoute
+  '/configuracoes': typeof AuthenticatedConfiguracoesRoute
+  '/painel': typeof AuthenticatedPainelRoute
+  '/api/public/whatsapp/webhook': typeof ApiPublicWhatsappWebhookRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/auth': typeof AuthRoute
+  '/configuracoes': typeof AuthenticatedConfiguracoesRoute
+  '/painel': typeof AuthenticatedPainelRoute
+  '/api/public/whatsapp/webhook': typeof ApiPublicWhatsappWebhookRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/_authenticated': typeof AuthenticatedRouteRouteWithChildren
+  '/auth': typeof AuthRoute
+  '/_authenticated/configuracoes': typeof AuthenticatedConfiguracoesRoute
+  '/_authenticated/painel': typeof AuthenticatedPainelRoute
+  '/api/public/whatsapp/webhook': typeof ApiPublicWhatsappWebhookRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/'
+  fullPaths:
+    | '/'
+    | '/auth'
+    | '/configuracoes'
+    | '/painel'
+    | '/api/public/whatsapp/webhook'
   fileRoutesByTo: FileRoutesByTo
-  to: '/'
-  id: '__root__' | '/'
+  to:
+    | '/'
+    | '/auth'
+    | '/configuracoes'
+    | '/painel'
+    | '/api/public/whatsapp/webhook'
+  id:
+    | '__root__'
+    | '/'
+    | '/_authenticated'
+    | '/auth'
+    | '/_authenticated/configuracoes'
+    | '/_authenticated/painel'
+    | '/api/public/whatsapp/webhook'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AuthenticatedRouteRoute: typeof AuthenticatedRouteRouteWithChildren
+  AuthRoute: typeof AuthRoute
+  ApiPublicWhatsappWebhookRoute: typeof ApiPublicWhatsappWebhookRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -48,11 +112,62 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/_authenticated': {
+      id: '/_authenticated'
+      path: ''
+      fullPath: '/'
+      preLoaderRoute: typeof AuthenticatedRouteRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/auth': {
+      id: '/auth'
+      path: '/auth'
+      fullPath: '/auth'
+      preLoaderRoute: typeof AuthRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/_authenticated/configuracoes': {
+      id: '/_authenticated/configuracoes'
+      path: '/configuracoes'
+      fullPath: '/configuracoes'
+      preLoaderRoute: typeof AuthenticatedConfiguracoesRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/painel': {
+      id: '/_authenticated/painel'
+      path: '/painel'
+      fullPath: '/painel'
+      preLoaderRoute: typeof AuthenticatedPainelRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/api/public/whatsapp/webhook': {
+      id: '/api/public/whatsapp/webhook'
+      path: '/api/public/whatsapp/webhook'
+      fullPath: '/api/public/whatsapp/webhook'
+      preLoaderRoute: typeof ApiPublicWhatsappWebhookRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
+interface AuthenticatedRouteRouteChildren {
+  AuthenticatedConfiguracoesRoute: typeof AuthenticatedConfiguracoesRoute
+  AuthenticatedPainelRoute: typeof AuthenticatedPainelRoute
+}
+
+const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
+  AuthenticatedConfiguracoesRoute: AuthenticatedConfiguracoesRoute,
+  AuthenticatedPainelRoute: AuthenticatedPainelRoute,
+}
+
+const AuthenticatedRouteRouteWithChildren =
+  AuthenticatedRouteRoute._addFileChildren(AuthenticatedRouteRouteChildren)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AuthenticatedRouteRoute: AuthenticatedRouteRouteWithChildren,
+  AuthRoute: AuthRoute,
+  ApiPublicWhatsappWebhookRoute: ApiPublicWhatsappWebhookRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
