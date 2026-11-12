@@ -1,7 +1,7 @@
 // Server-only: exposes the worker's waitUntil to route handlers.
 import { AsyncLocalStorage } from "node:async_hooks";
 
-type Ctx = { waitUntil?: (p: Promise<unknown>) => void };
+type Ctx = { waitUntil?: ((p: Promise<unknown>) => void) | undefined };
 export const requestContext = new AsyncLocalStorage<Ctx>();
 
 /** Runs work after the response is sent when the runtime allows it; otherwise awaits it. */
