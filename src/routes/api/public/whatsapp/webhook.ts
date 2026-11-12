@@ -1,0 +1,51 @@
+import { createFileRoute } from "@tanstack/react-router";
+import { verifyWebhookRequest } from "@lovable.dev/webhooks-js";
+
+export const Route = createFileRoute("/api/public/whatsapp/webhook")({
+  server: {
+    handlers: {
+      POST: async ({ request }) => {
+        const deliveryId = request.headers.get("X-Lovable-Delivery");
+        const event = request.headers.get("X-Lovable-Event");
+        let payload: unknown;
+        try {
+          const verified = await verifyWebhookRequest({
+            req: request,
+            secret: process.env.WHATSAPP_API_KEY,
+            maxBodyBytes: 4 * 1024 * 1024,
+          });
+          payload = verified.payload;
+        } catch {
+          return new Response("Unauthorized", { status: 401 });
+        }
+        if (!deliveryId || !event) return new Response("Missing headers", { status: 400 });
+
+        const { supabaseAdmin: db } = await import("@/integrations/supabase/client.server");
+        const { processStoredEvent, recoverPending } = await import("@/lib/webhook-processor.server");
+
+        const { error: insErr } = await db
+          .from("whatsapp_webhook_events")
+          .upsert({ delivery_id: deliveryId, event, payload: payload as any }, { onConflict: "delivery_id", ignoreDuplicates: true });
+        if (insErr) {
+          console.error(insErr);
+          return new Response("Storage error", { status: 500 });
+        }
+        const { data: row, error } = await db
+          .from("whatsapp_webhook_events")
+          .select("id, event, payload, attempts, processed_at")
+          .eq("delivery_id", deliveryId)
+          .single();
+        if (error || !row) return new Response("Storage error", { status: 500 });
+        if (row.processed_at) return new Response("ok");
+
+        const ok = await processStoredEvent(db, row);
+        try {
+          await recoverPending(db, row.id);
+        } catch (e) {
+          console.error("recovery failed", e);
+        }
+        return ok ? new Response("ok") : new Response("Processing error", { status: 500 });
+      },
+    },
+  },
+});
