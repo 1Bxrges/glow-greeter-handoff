@@ -31,7 +31,7 @@ export async function runSecretary(opts: {
   maxAiReplies: number;
   contactName: string | null;
 }): Promise<AiDecision> {
-  const apiKey = process.env.LOVABLE_API_KEY;
+  const apiKey = process.env['LOVABLE_API_KEY'];
   if (!apiKey) throw new Error("LOVABLE_API_KEY ausente");
   const { settings: s } = opts;
   const finalTurn = opts.aiRepliesSoFar >= opts.maxAiReplies;

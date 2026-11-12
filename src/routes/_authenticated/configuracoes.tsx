@@ -60,7 +60,10 @@ function SettingsForm() {
     const { id, updated_at, ...rest } = form!;
     const { error } = await supabase.from("clinic_settings").update({ ...rest, max_ai_replies: Math.min(5, Math.max(1, rest.max_ai_replies)), updated_at: new Date().toISOString() }).eq("id", 1);
     setSaving(false);
-    if (error) return toast.error("Não foi possível salvar", { description: error.message });
+    if (error) {
+      toast.error("Não foi possível salvar", { description: error.message });
+      return;
+    }
     toast.success("Configurações salvas");
     qc.invalidateQueries({ queryKey: ["settings"] });
   }

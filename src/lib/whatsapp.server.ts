@@ -6,8 +6,8 @@ export type SendResult =
   | { ok: false; definite: boolean; error: string };
 
 export async function sendWhatsAppText(to: string, body: string): Promise<SendResult> {
-  const lovableKey = process.env.LOVABLE_API_KEY;
-  const waKey = process.env.WHATSAPP_API_KEY;
+  const lovableKey = process.env['LOVABLE_API_KEY'];
+  const waKey = process.env['WHATSAPP_API_KEY'];
   if (!lovableKey || !waKey) return { ok: false, definite: true, error: "WhatsApp não configurado" };
   let response: Response;
   try {
