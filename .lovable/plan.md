@@ -3,16 +3,13 @@
 ## Objetivo
 Quando um lead chega pelo WhatsApp (vindo do tráfego), a IA responde em segundos, faz algumas perguntas de qualificação e depois **para e avisa você** para assumir a conversa. A IA não vende nem agenda.
 
-## Como funciona a conversa
-1. Lead manda mensagem (ex.: "Vi o anúncio do preenchimento labial").
-2. A IA identifica o procedimento de interesse e cumprimenta.
-3. Faz de 2 a 4 perguntas de qualificação, uma por vez, por exemplo:
-   - "Você está interessada no preenchimento labial?"
-   - "É a primeira vez ou você já fez antes?"
-   - "Que resultado você está buscando?"
-   - "Tem preferência de dia ou horário para uma avaliação?"
-4. Quando já tem as respostas, ou se o lead perguntar preço, pedir para falar com uma pessoa, ou trouxer uma dúvida médica, a IA manda uma mensagem curta ("Perfeito! Já vou te passar para nossa especialista") e **desliga para aquela conversa**.
-5. Você recebe o aviso no painel: "Agora é com você".
+## Como funciona a conversa (curta, só para aquecer o lead)
+1. O lead manda a primeira mensagem (ex.: "Vi o anúncio do labial").
+2. **1ª resposta da IA**, em segundos: cumprimenta e faz uma pergunta. Ex.: "Oi! Você está buscando o preenchimento labial? É a primeira vez ou você já fez antes?"
+3. O lead responde.
+4. **2ª resposta da IA**: comenta com simpatia e faz mais uma pergunta. Ex.: "Que bacana! E o que você está buscando: mais volume, contorno ou hidratação?"
+5. Quando o lead responde de novo, a IA **para** e a conversa vai para você com o aviso "Agora é com você". A IA pode mandar uma frase de passagem ("Perfeito, já te passo para nossa especialista"), e você escolhe se quer isso nas configurações.
+6. Se o lead pedir preço, quiser falar com uma pessoa ou trouxer uma dúvida médica antes disso, a IA passa para você na hora.
 
 ## Painel (a interface)
 - **Lista de conversas** com status em cores: "IA atendendo", "Aguardando você", "Você atendendo", "Encerrada".
