@@ -1,3 +1,4 @@
 - [x] AI secretary: short first contact on WhatsApp, then hand off to the doctor
 - [x] Panel to follow conversations and take over
 - [ ] Optional later: AI scheduling (user said not needed for now)
+- [x] AI understands WhatsApp voice messages (transcribe audio)

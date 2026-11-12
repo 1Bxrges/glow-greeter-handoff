@@ -93,7 +93,20 @@ async function handleInbound(db: DB, value: any) {
       if (error) throw error;
       conv = { ...conv, mode: "humano" };
     }
-    const body = textOf(m);
+    let body = textOf(m);
+    if (m.type === "audio" && m.audio?.id) {
+      const { data: seen } = await db.from("messages").select("id").eq("wa_message_id", m.id).maybeSingle();
+      if (!seen) {
+        try {
+          const { transcribeWhatsAppAudio } = await import("./audio.server");
+          const t = await transcribeWhatsAppAudio(m.audio.id);
+          body = t ? `🎤 Áudio: "${t}"` : "🎤 Áudio (sem fala identificada)";
+        } catch (e) {
+          console.error("audio transcription failed", e);
+          body = "🎤 Áudio (não foi possível ouvir)";
+        }
+      }
+    }
     const created = m.timestamp ? new Date(Number(m.timestamp) * 1000).toISOString() : new Date().toISOString();
     const wantsReply = conv.mode === "ia" ? "pending" : "none";
     const { error } = await db.from("messages").upsert(

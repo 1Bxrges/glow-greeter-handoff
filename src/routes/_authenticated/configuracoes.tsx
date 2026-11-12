@@ -104,8 +104,8 @@ function SettingsForm() {
           <F label="Nome da secretária"><Input value={form.assistant_name} onChange={(e) => set("assistant_name", e.target.value)} /></F>
         </div>
         <F label="Tom de voz"><Textarea rows={2} value={form.tone} onChange={(e) => set("tone", e.target.value)} /></F>
-        <F label="Procedimentos (um por linha)"><Textarea rows={6} value={form.procedures} onChange={(e) => set("procedures", e.target.value)} /></F>
-        <F label="Perguntas de qualificação (uma por linha, na ordem)"><Textarea rows={4} value={form.questions} onChange={(e) => set("questions", e.target.value)} /></F>
+        <F label="Procedimentos e pergunta específica (um por linha, no formato Procedimento: pergunta)"><Textarea rows={6} value={form.procedures} onChange={(e) => set("procedures", e.target.value)} /></F>
+        <F label="Perguntas gerais, feitas antes da específica (uma por linha)"><Textarea rows={4} value={form.questions} onChange={(e) => set("questions", e.target.value)} /></F>
       </Card>
 
       <Card>
