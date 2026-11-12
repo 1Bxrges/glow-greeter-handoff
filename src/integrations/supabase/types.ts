@@ -14,16 +14,48 @@ export type Database = {
   }
   public: {
     Tables: {
+      clinic_audios: {
+        Row: {
+          created_at: string
+          id: string
+          mime_type: string
+          storage_path: string
+          title: string
+          use_when: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          mime_type: string
+          storage_path: string
+          title: string
+          use_when?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          mime_type?: string
+          storage_path?: string
+          title?: string
+          use_when?: string
+        }
+        Relationships: []
+      }
       clinic_settings: {
         Row: {
           ai_enabled: boolean
           assistant_name: string
           clinic_name: string
+          followup_audio_id: string | null
+          followup_enabled: boolean
+          followup_minutes: number
+          followup_text: string
           handoff_message: string
           id: number
           max_ai_replies: number
           procedures: string
           questions: string
+          reply_delay_seconds: number
           send_handoff_message: boolean
           test_mode: boolean
           test_numbers: string
@@ -34,11 +66,16 @@ export type Database = {
           ai_enabled?: boolean
           assistant_name?: string
           clinic_name?: string
+          followup_audio_id?: string | null
+          followup_enabled?: boolean
+          followup_minutes?: number
+          followup_text?: string
           handoff_message?: string
           id?: number
           max_ai_replies?: number
           procedures?: string
           questions?: string
+          reply_delay_seconds?: number
           send_handoff_message?: boolean
           test_mode?: boolean
           test_numbers?: string
@@ -49,11 +86,16 @@ export type Database = {
           ai_enabled?: boolean
           assistant_name?: string
           clinic_name?: string
+          followup_audio_id?: string | null
+          followup_enabled?: boolean
+          followup_minutes?: number
+          followup_text?: string
           handoff_message?: string
           id?: number
           max_ai_replies?: number
           procedures?: string
           questions?: string
+          reply_delay_seconds?: number
           send_handoff_message?: boolean
           test_mode?: boolean
           test_numbers?: string
@@ -68,6 +110,7 @@ export type Database = {
           contact_name: string | null
           created_at: string
           experience: string | null
+          followup_sent_at: string | null
           goal: string | null
           handoff_at: string | null
           handoff_reason: string | null
@@ -85,6 +128,7 @@ export type Database = {
           contact_name?: string | null
           created_at?: string
           experience?: string | null
+          followup_sent_at?: string | null
           goal?: string | null
           handoff_at?: string | null
           handoff_reason?: string | null
@@ -102,6 +146,7 @@ export type Database = {
           contact_name?: string | null
           created_at?: string
           experience?: string | null
+          followup_sent_at?: string | null
           goal?: string | null
           handoff_at?: string | null
           handoff_reason?: string | null
@@ -145,6 +190,7 @@ export type Database = {
       }
       messages: {
         Row: {
+          audio_id: string | null
           body: string
           conversation_id: string
           created_at: string
@@ -160,6 +206,7 @@ export type Database = {
           wa_message_id: string | null
         }
         Insert: {
+          audio_id?: string | null
           body?: string
           conversation_id: string
           created_at?: string
@@ -175,6 +222,7 @@ export type Database = {
           wa_message_id?: string | null
         }
         Update: {
+          audio_id?: string | null
           body?: string
           conversation_id?: string
           created_at?: string

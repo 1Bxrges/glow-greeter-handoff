@@ -15,6 +15,13 @@
       "when": 1794516655193,
       "tag": "0001_test_mode",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1794517844536,
+      "tag": "0002_audios_delay_followup",
+      "breakpoints": true
     }
   ]
 }
