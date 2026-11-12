@@ -6,6 +6,17 @@ import { createLovableAiGatewayRunIdFetch } from "./run-id.server";
 
 const MODEL = "openai/gpt-6-astra";
 
+const FAST_OPTIONS = { forceReasoning: true, reasoningEffort: "none", store: false };
+const SAFE_OPTIONS = {
+  forceReasoning: true,
+  reasoningEffort: "low",
+  reasoningSummary: "auto",
+  store: false,
+  include: ["reasoning.encrypted_content"],
+};
+// Kept while this server instance lives, so a rejected fast setting is not retried on every message.
+let fastModeRejected = false;
+
 export type Settings = {
   clinic_name: string;
   assistant_name: string;
@@ -97,22 +108,29 @@ ${finalTurn ? "- ESTA É A ÚLTIMA MENSAGEM: marque handoff=true com handoff_rea
     fetch: runIdFetch.fetch,
   });
 
-  const result = streamText({
-    model: provider.responses(MODEL),
-    instructions,
-    messages,
-    output: Output.object({ schema }),
-    providerOptions: {
-      openai: {
-        forceReasoning: true,
-        reasoningEffort: "low",
-        reasoningSummary: "auto",
-        store: false,
-        include: ["reasoning.encrypted_content"],
-      },
-    },
-  });
-  const out = await result.output;
+  const ask = (openai: Record<string, string | boolean | string[]>) =>
+    streamText({
+      model: provider.responses(MODEL),
+      instructions,
+      messages,
+      output: Output.object({ schema }),
+      providerOptions: { openai },
+    }).output;
+
+  // Triage is simple: answer without the model's extra "thinking" step, which costs seconds.
+  // If the model refuses that setting, fall back to the previous one and remember it.
+  let out: AiDecision;
+  if (fastModeRejected) {
+    out = await ask(SAFE_OPTIONS);
+  } else {
+    try {
+      out = await ask(FAST_OPTIONS);
+    } catch (e) {
+      console.warn("fast AI settings rejected, using reasoning settings", e);
+      fastModeRejected = true;
+      out = await ask(SAFE_OPTIONS);
+    }
+  }
   if (finalTurn) out.handoff = true;
   if (out.audio != null && (out.audio < 1 || out.audio > audios.length)) out.audio = null;
   return out;

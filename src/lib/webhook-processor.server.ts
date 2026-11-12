@@ -1,7 +1,7 @@
 // Server-only: durable processing of WhatsApp webhook events.
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/integrations/supabase/types";
-import { runSecretary } from "./ai-secretary.server";
+import { runSecretary, type AiDecision } from "./ai-secretary.server";
 import { sendWhatsAppAudio, sendWhatsAppText, showTyping, type SendResult } from "./whatsapp.server";
 import { aiAllowedFor } from "./rules/test-mode";
 
@@ -19,13 +19,18 @@ async function deliver(
   conv: { id: string; wa_phone: string },
   row: { body: string; audio_id?: string | null },
   send: () => Promise<SendResult>,
+  beforeSend?: Promise<unknown>,
 ): Promise<SendResult> {
-  const { data: outRow, error: outErr } = await db
-    .from("messages")
-    .insert({ conversation_id: conv.id, direction: "out", sender: "ia", body: row.body, audio_id: row.audio_id ?? null, status: "sending" })
-    .select("id")
-    .single();
-  if (outErr) throw outErr;
+  // The outbound row is saved while `beforeSend` (state that must be recorded first) finishes.
+  const [{ data: outRow, error: outErr }] = await Promise.all([
+    db
+      .from("messages")
+      .insert({ conversation_id: conv.id, direction: "out", sender: "ia", body: row.body, audio_id: row.audio_id ?? null, status: "sending" })
+      .select("id")
+      .single(),
+    beforeSend,
+  ]);
+  if (outErr || !outRow) throw outErr ?? new Error("mensagem não salva");
   const sent = await send();
   if (!sent.ok) {
     await db.from("messages").update({ status: sent.definite ? "failed" : "unknown", error: sent.error }).eq("id", outRow.id);
@@ -123,10 +128,15 @@ async function handleEchoes(db: DB, value: any) {
 async function handleInbound(db: DB, value: any) {
   const names = new Map<string, string>();
   for (const c of value.contacts ?? []) if (c.wa_id && c.profile?.name) names.set(c.wa_id, c.profile.name);
+  const inbound: any[] = value.messages ?? [];
+  if (!inbound.length) return;
+  // Settings and the first conversation are looked up at the same time.
+  const firstConv = upsertConversation(db, inbound[0].from, names.get(inbound[0].from) ?? null);
+  firstConv.catch(() => {}); // the error is handled where it is awaited below
   const { data: settings, error: setErr } = await db.from("clinic_settings").select("test_mode, test_numbers").eq("id", 1).single();
   if (setErr) throw setErr;
-  for (const m of value.messages ?? []) {
-    let conv = await upsertConversation(db, m.from, names.get(m.from) ?? null);
+  for (const [i, m] of inbound.entries()) {
+    let conv = i === 0 ? await firstConv : await upsertConversation(db, m.from, names.get(m.from) ?? null);
     // Test mode: other numbers are left to the team, silently.
     if (conv.mode === "ia" && !aiAllowedFor(m.from, settings.test_mode, settings.test_numbers)) {
       const { error } = await db.from("conversations").update({ mode: "humano" }).eq("id", conv.id);
@@ -149,21 +159,23 @@ async function handleInbound(db: DB, value: any) {
     }
     const created = m.timestamp ? new Date(Number(m.timestamp) * 1000).toISOString() : new Date().toISOString();
     const wantsReply = conv.mode === "ia" ? "pending" : "none";
-    const { error } = await db.from("messages").upsert(
-      { conversation_id: conv.id, direction: "in", sender: "lead", body, wa_message_id: m.id, status: "received", created_at: created, reply_state: wantsReply },
-      { onConflict: "wa_message_id", ignoreDuplicates: true },
-    );
-    if (error) throw error;
     const reopen = conv.mode === "encerrada";
-    await db
-      .from("conversations")
-      .update({
-        last_message_at: created,
-        last_inbound_at: created,
-        last_message_preview: body.slice(0, 140),
-        ...(reopen ? { mode: "aguardando_humano", handoff_reason: "Lead voltou a escrever", handoff_at: new Date().toISOString(), followup_sent_at: null } : {}),
-      })
-      .eq("id", conv.id);
+    const [{ error }] = await Promise.all([
+      db.from("messages").upsert(
+        { conversation_id: conv.id, direction: "in", sender: "lead", body, wa_message_id: m.id, status: "received", created_at: created, reply_state: wantsReply },
+        { onConflict: "wa_message_id", ignoreDuplicates: true },
+      ),
+      db
+        .from("conversations")
+        .update({
+          last_message_at: created,
+          last_inbound_at: created,
+          last_message_preview: body.slice(0, 140),
+          ...(reopen ? { mode: "aguardando_humano", handoff_reason: "Lead voltou a escrever", handoff_at: new Date().toISOString(), followup_sent_at: null } : {}),
+        })
+        .eq("id", conv.id),
+    ]);
+    if (error) throw error;
   }
 }
 
@@ -207,27 +219,16 @@ export async function processReply(db: DB, messageId: string) {
   }
 
   // A newer lead message will be answered with the full context instead.
-  const { data: newer } = await db
-    .from("messages")
-    .select("id")
-    .eq("conversation_id", conv.id)
-    .eq("sender", "lead")
-    .gt("created_at", claimed.created_at)
-    .limit(1);
+  const [{ data: newer }, { data: history, error: hErr }, { data: audios, error: aErr }] = await Promise.all([
+    db.from("messages").select("id").eq("conversation_id", conv.id).eq("sender", "lead").gt("created_at", claimed.created_at).limit(1),
+    db.from("messages").select("sender, body").eq("conversation_id", conv.id).order("created_at", { ascending: true }).limit(60),
+    db.from("clinic_audios").select("*").order("created_at", { ascending: true }).limit(20),
+  ]);
   if (newer?.length) return finish("skipped");
-
-  const { data: history, error: hErr } = await db
-    .from("messages")
-    .select("sender, body")
-    .eq("conversation_id", conv.id)
-    .order("created_at", { ascending: true })
-    .limit(60);
   if (hErr) throw hErr;
-
-  const { data: audios, error: aErr } = await db.from("clinic_audios").select("*").order("created_at", { ascending: true }).limit(20);
   if (aErr) throw aErr;
 
-  let decision;
+  let decision: AiDecision;
   try {
     decision = await runSecretary({
       settings,
@@ -256,7 +257,8 @@ export async function processReply(db: DB, messageId: string) {
   }
 
   // Record progress before sending so an interrupted run never loses the conversation state.
-  const { error: preErr } = await db
+  const recordProgress = async () => {
+    const { error: preErr } = await db
     .from("conversations")
     .update({
       ...summary,
@@ -266,13 +268,15 @@ export async function processReply(db: DB, messageId: string) {
         : {}),
     })
     .eq("id", conv.id);
-  if (preErr) throw preErr;
+    if (preErr) throw preErr;
+  };
 
   const audio = !decision.handoff && decision.audio != null ? (audios ?? [])[decision.audio - 1] : undefined;
 
+  if (!text) await recordProgress();
   if (text) {
-    await finish("sent_pending");
-    const sent = await deliver(db, conv, { body: text }, () => sendWhatsAppText(conv.wa_phone, text));
+    // Progress, the reply marker and the outbound row are all saved together, then the message goes out.
+    const sent = await deliver(db, conv, { body: text }, () => sendWhatsAppText(conv.wa_phone, text), Promise.all([recordProgress(), finish("sent_pending")]));
     if (!sent.ok) {
       await db.from("conversations").update({ mode: "aguardando_humano", handoff_reason: sent.definite ? "Falha ao enviar resposta da IA" : "Envio da IA incerto, confira", handoff_at: new Date().toISOString() }).eq("id", conv.id);
       return finish(sent.definite ? "failed_send" : "unknown", sent.error);
