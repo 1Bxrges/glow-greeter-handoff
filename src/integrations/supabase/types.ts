@@ -14,16 +14,254 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      clinic_settings: {
+        Row: {
+          ai_enabled: boolean
+          assistant_name: string
+          clinic_name: string
+          handoff_message: string
+          id: number
+          max_ai_replies: number
+          procedures: string
+          questions: string
+          send_handoff_message: boolean
+          tone: string
+          updated_at: string
+        }
+        Insert: {
+          ai_enabled?: boolean
+          assistant_name?: string
+          clinic_name?: string
+          handoff_message?: string
+          id?: number
+          max_ai_replies?: number
+          procedures?: string
+          questions?: string
+          send_handoff_message?: boolean
+          tone?: string
+          updated_at?: string
+        }
+        Update: {
+          ai_enabled?: boolean
+          assistant_name?: string
+          clinic_name?: string
+          handoff_message?: string
+          id?: number
+          max_ai_replies?: number
+          procedures?: string
+          questions?: string
+          send_handoff_message?: boolean
+          tone?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      conversations: {
+        Row: {
+          ai_replies: number
+          contact_name: string | null
+          created_at: string
+          experience: string | null
+          goal: string | null
+          handoff_at: string | null
+          handoff_reason: string | null
+          id: string
+          last_inbound_at: string | null
+          last_message_at: string
+          last_message_preview: string | null
+          mode: string
+          notes: string | null
+          procedure: string | null
+          wa_phone: string
+        }
+        Insert: {
+          ai_replies?: number
+          contact_name?: string | null
+          created_at?: string
+          experience?: string | null
+          goal?: string | null
+          handoff_at?: string | null
+          handoff_reason?: string | null
+          id?: string
+          last_inbound_at?: string | null
+          last_message_at?: string
+          last_message_preview?: string | null
+          mode?: string
+          notes?: string | null
+          procedure?: string | null
+          wa_phone: string
+        }
+        Update: {
+          ai_replies?: number
+          contact_name?: string | null
+          created_at?: string
+          experience?: string | null
+          goal?: string | null
+          handoff_at?: string | null
+          handoff_reason?: string | null
+          id?: string
+          last_inbound_at?: string | null
+          last_message_at?: string
+          last_message_preview?: string | null
+          mode?: string
+          notes?: string | null
+          procedure?: string | null
+          wa_phone?: string
+        }
+        Relationships: []
+      }
+      message_status_events: {
+        Row: {
+          created_at: string
+          errors: Json | null
+          id: string
+          status: string
+          status_ts: string | null
+          wa_message_id: string
+        }
+        Insert: {
+          created_at?: string
+          errors?: Json | null
+          id?: string
+          status: string
+          status_ts?: string | null
+          wa_message_id: string
+        }
+        Update: {
+          created_at?: string
+          errors?: Json | null
+          id?: string
+          status?: string
+          status_ts?: string | null
+          wa_message_id?: string
+        }
+        Relationships: []
+      }
+      messages: {
+        Row: {
+          body: string
+          conversation_id: string
+          created_at: string
+          direction: string
+          error: string | null
+          id: string
+          reply_error: string | null
+          reply_started_at: string | null
+          reply_state: string
+          sender: string
+          status: string
+          status_at: string | null
+          wa_message_id: string | null
+        }
+        Insert: {
+          body?: string
+          conversation_id: string
+          created_at?: string
+          direction: string
+          error?: string | null
+          id?: string
+          reply_error?: string | null
+          reply_started_at?: string | null
+          reply_state?: string
+          sender: string
+          status?: string
+          status_at?: string | null
+          wa_message_id?: string | null
+        }
+        Update: {
+          body?: string
+          conversation_id?: string
+          created_at?: string
+          direction?: string
+          error?: string | null
+          id?: string
+          reply_error?: string | null
+          reply_started_at?: string | null
+          reply_state?: string
+          sender?: string
+          status?: string
+          status_at?: string | null
+          wa_message_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "messages_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "conversations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      user_roles: {
+        Row: {
+          id: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Insert: {
+          id?: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Update: {
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id?: string
+        }
+        Relationships: []
+      }
+      whatsapp_webhook_events: {
+        Row: {
+          attempts: number
+          delivery_id: string
+          event: string
+          id: string
+          last_attempt_at: string | null
+          payload: Json
+          processed_at: string | null
+          processing_error: string | null
+          received_at: string
+        }
+        Insert: {
+          attempts?: number
+          delivery_id: string
+          event: string
+          id?: string
+          last_attempt_at?: string | null
+          payload: Json
+          processed_at?: string | null
+          processing_error?: string | null
+          received_at?: string
+        }
+        Update: {
+          attempts?: number
+          delivery_id?: string
+          event?: string
+          id?: string
+          last_attempt_at?: string | null
+          payload?: Json
+          processed_at?: string | null
+          processing_error?: string | null
+          received_at?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      has_role: {
+        Args: {
+          _role: Database["public"]["Enums"]["app_role"]
+          _user_id: string
+        }
+        Returns: boolean
+      }
     }
     Enums: {
-      [_ in never]: never
+      app_role: "staff"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -150,6 +388,8 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      app_role: ["staff"],
+    },
   },
 } as const
