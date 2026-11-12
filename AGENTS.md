@@ -28,3 +28,8 @@ use the editor.
   own key and store it in Secrets.
 - **Secrets.** Lovable manages them. Do not put secret values in the repo.
 <!-- LOVABLE:END -->
+
+## Project rules
+- WhatsApp webhooks land in `/api/public/whatsapp/webhook`, are stored in `whatsapp_webhook_events` first, then processed idempotently in `src/lib/webhook-processor.server.ts`; recovery runs on each webhook call because the worker has no background queue.
+- AI first-contact runs inline in the webhook (`src/lib/ai-secretary.server.ts`, Responses API, structured output) and only replies while `conversations.mode = 'ia'`; any human message (panel or phone echo) switches the conversation to `humano`.
+- Panel access is gated by the `staff` role in `user_roles`; the first account created is granted staff automatically by a DB trigger.
