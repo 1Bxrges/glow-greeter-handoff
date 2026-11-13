@@ -13,6 +13,8 @@ export const AUDIO_BUCKET = "clinic-audios";
  * longer ones are picked up by the every-minute job once the message is old enough. */
 export const MAX_INLINE_DELAY_SECONDS = 15;
 export const MAX_REPLY_DELAY_SECONDS = 120;
+/** Older lead messages are passed to the team instead of being answered late by the AI. */
+export const STALE_REPLY_MINUTES = 10;
 
 export function replyIsDue(createdAt: string, delaySeconds: number, now = Date.now()) {
   return now - new Date(createdAt).getTime() >= Math.max(0, delaySeconds) * 1000;
@@ -217,6 +219,12 @@ export async function processReply(db: DB, messageId: string) {
   if (sErr) throw sErr;
   if (conv.mode !== "ia" || !settings.ai_enabled) return finish("skipped");
   if (!aiAllowedFor(conv.wa_phone, settings.test_mode, settings.test_numbers)) return finish("skipped");
+
+  // Never answer a lead hours later: if the reply got stuck, hand the conversation to the team instead.
+  if (Date.now() - new Date(claimed.created_at).getTime() > STALE_REPLY_MINUTES * 60_000) {
+    await db.from("conversations").update({ mode: "aguardando_humano", handoff_reason: "A IA não respondeu a tempo", handoff_at: new Date().toISOString(), followup_sent_at: null }).eq("id", conv.id);
+    return finish("skipped", "mensagem antiga demais para a IA responder");
+  }
 
   // Human-like pause, counted from when the lead wrote. Retries of old messages don't wait again.
   const delayMs = delaySeconds * 1000;
