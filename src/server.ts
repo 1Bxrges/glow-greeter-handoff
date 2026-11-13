@@ -45,6 +45,22 @@ function isH3SwallowedErrorBody(body: string): boolean {
   }
 }
 
+type WaitUntil = (p: Promise<unknown>) => void;
+type WaitUntilHolder = { waitUntil?: WaitUntil };
+
+/**
+ * On Cloudflare, nitro calls this entry with only the request and puts the worker's waitUntil
+ * on the request itself (request.waitUntil / request.runtime.cloudflare.context). Without it,
+ * work "after the response" ran before it, so the WhatsApp gateway (≈5s limit) cut every AI reply.
+ */
+function findWaitUntil(request: Request, ctx: unknown): WaitUntil | undefined {
+  const req = request as Request & WaitUntilHolder & { runtime?: { cloudflare?: { context?: WaitUntilHolder } } };
+  const holders: (WaitUntilHolder | undefined)[] = [ctx as WaitUntilHolder | undefined, req.runtime?.cloudflare?.context];
+  for (const h of holders) if (typeof h?.waitUntil === "function") return h.waitUntil.bind(h);
+  if (typeof req.waitUntil === "function") return req.waitUntil;
+  return undefined;
+}
+
 // Hosting compresses every response at the edge. Never compress a body (gzip, brotli,
 // CompressionStream) or set content-encoding here or in a server route: the body gets encoded
 // twice and renders garbled.
@@ -52,8 +68,7 @@ export default {
   async fetch(request: Request, env: unknown, ctx: unknown) {
     try {
       const handler = await getServerEntry();
-      const execCtx = ctx as { waitUntil?: (p: Promise<unknown>) => void } | undefined;
-      const waitUntil = execCtx?.waitUntil ? execCtx.waitUntil.bind(execCtx) : undefined;
+      const waitUntil = findWaitUntil(request, ctx);
       const response = await requestContext.run({ waitUntil }, () => handler.fetch(request, env, ctx));
       return await normalizeCatastrophicSsrResponse(response);
     } catch (error) {
