@@ -145,7 +145,7 @@ function SettingsForm() {
         <F label={`Esperar antes de responder (segundos, de 0 a ${MAX_DELAY})`}>
           <Input type="number" min={0} max={MAX_DELAY} className="w-24" value={form.reply_delay_seconds} onChange={(e) => set("reply_delay_seconds", Math.min(MAX_DELAY, Math.max(0, Math.round(Number(e.target.value)) || 0)))} />
         </F>
-        <p className="text-sm text-muted-foreground">A IA aparece como “digitando…” e responde depois desse tempo, para parecer uma pessoa. Se o lead mandar várias mensagens seguidas, ela responde tudo de uma vez.</p>
+        <p className="text-sm text-muted-foreground">Até 15s a IA aparece como “digitando…”; acima disso ela confere a cada minuto, então com 47s a resposta sai entre 47s e cerca de 1min45. Se o lead mandar várias mensagens seguidas, ela responde tudo de uma vez.</p>
       </Card>
 
       <Card>
