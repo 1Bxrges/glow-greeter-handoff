@@ -11,10 +11,9 @@ type ClinicAudio = Database["public"]["Tables"]["clinic_audios"]["Row"];
 export const AUDIO_BUCKET = "clinic-audios";
 /** The worker only keeps running ~30s after answering the webhook: short waits happen inline,
  * longer ones are picked up by the every-minute job once the message is old enough. */
-// Measured in production: the WhatsApp gateway gives up on the webhook after ~5s and the work
-// still running is killed (it then redelivers the event). The whole reply has to fit in that
-// window, so there is no room for a "human" pause; the setting is ignored until a scheduler exists.
-export const MAX_INLINE_DELAY_SECONDS = 0;
+// The webhook answers the gateway at once and the reply runs in waitUntil, which Cloudflare keeps
+// alive for ~30s after the response. Pause (max 15s) + AI call (max 12s) must fit in that window.
+export const MAX_INLINE_DELAY_SECONDS = 15;
 export const MAX_REPLY_DELAY_SECONDS = 120;
 /** Older lead messages are passed to the team instead of being answered late by the AI. */
 export const STALE_REPLY_MINUTES = 10;
@@ -196,8 +195,8 @@ export async function processReply(db: DB, messageId: string) {
   const delaySeconds = Math.min(Math.max(delaySet?.reply_delay_seconds ?? 0, 0), MAX_REPLY_DELAY_SECONDS);
   // The server is cut off ~30s after the webhook is answered, so the wait never goes past
   // MAX_INLINE_DELAY_SECONDS here: a longer setting would leave the lead without any reply.
-  // A reply still "sending" after 20s was killed with its request (see above), so it can be retried.
-  const staleBefore = new Date(Date.now() - 20_000).toISOString();
+  // A reply still "sending" after 35s was killed with its request (pause + AI fit in ~30s), so it can be retried.
+  const staleBefore = new Date(Date.now() - 35_000).toISOString();
   const { data: claimed, error: claimErr } = await db
     .from("messages")
     .update({ reply_state: "sending", reply_started_at: new Date().toISOString(), reply_error: null })

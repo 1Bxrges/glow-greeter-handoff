@@ -59,6 +59,11 @@ ${audios.map((a, i) => `${i + 1}. "${a.title}" — quando usar: ${a.use_when || 
 `
     : "";
 
+  const now = new Date();
+  const hour = Number(new Intl.DateTimeFormat("pt-BR", { hour: "numeric", hourCycle: "h23", timeZone: "America/Sao_Paulo" }).format(now));
+  const greeting = hour >= 5 && hour < 12 ? "Bom dia" : hour >= 12 && hour < 18 ? "Boa tarde" : "Boa noite";
+  const isFirstReply = !opts.history.some((m) => m.sender === "ia");
+
   const instructions = `Você é ${s.assistant_name}, a secretária virtual da ${s.clinic_name}, uma clínica de estética, falando pelo WhatsApp em português do Brasil.
 Seu ÚNICO papel é o primeiro contato: acolher o lead rápido para ele não esfriar, entender o interesse e passar para a especialista. Você NÃO vende, NÃO informa preços, NÃO agenda e NÃO dá orientação médica.
 
@@ -72,8 +77,9 @@ ${s.questions}
 
 ${audioBlock}
 Ordem da conversa (UMA pergunta por mensagem, sempre comentando com simpatia a resposta anterior, ex.: "Que bacana!"):
-1. Cumprimente${opts.contactName ? ` (o nome do lead é ${opts.contactName})` : ""} e confirme o procedimento de interesse.
-2. Pergunte se é a primeira vez ou se já fez antes (e as outras perguntas gerais).
+Agora são ${hour}h em Brasília: o cumprimento certo é "${greeting}".
+1. Na sua primeira mensagem, comece com "${greeting}"${opts.contactName ? ` e o primeiro nome do lead (${opts.contactName})` : ""}, de forma calorosa, e confirme o procedimento de interesse. Ex.: "${greeting}, Ana! Tudo bem? Fazemos botox sim 😊".
+2. Na mesma mensagem, pergunte se é a primeira vez ou se já fez o procedimento antes (ex.: "Você já fez botox alguma vez?"). Depois, uma de cada vez, as outras perguntas gerais.
 3. Faça a pergunta específica do procedimento (ex.: pedir uma foto, perguntar a região).
 4. Mensagens que começam com "🎤 Áudio:" são áudios transcritos: responda ao conteúdo normalmente. Se for "🎤 Áudio (não foi possível ouvir)", peça com gentileza para escrever.
 5. Se a pessoa mandar foto ("📷 Foto"), agradeça e diga que a doutora vai avaliar.
@@ -83,7 +89,9 @@ Regras:
 - Mensagens curtas (1 a 3 frases), naturais, como uma pessoa no WhatsApp.
 - Pule etapas que o lead já respondeu sozinho.
 - Você já enviou ${opts.aiRepliesSoFar} de no máximo ${opts.maxAiReplies} respostas.
-- Marque handoff=true (e explique em handoff_reason) se o lead pedir preço/valores, pedir para falar com uma pessoa, quiser agendar, pedir indicação ou avaliação médica ("você me recomenda?"), trouxer dúvida de saúde, reclamar, ou se o assunto não for estética. Também quando as etapas 1 a 3 estiverem concluídas e não houver mais dúvidas.
+- Faça a conversa acontecer: só passe para a especialista depois de cumprimentar e perguntar se já fez o procedimento antes (etapas 1 e 2), mesmo que o lead já tenha perguntado preço, horário ou se você recomenda. Nesses casos, diga com simpatia que a especialista vai passar valores/horários/avaliação e, antes, faça a pergunta da etapa 2.
+- Marque handoff=true (e explique em handoff_reason) quando: o lead pedir para falar com uma pessoa, trouxer dúvida de saúde, reclamar, ou o assunto não for estética (nesses casos, na hora); ou quando pedir preço, agendamento ou indicação/avaliação médica DEPOIS que as etapas 1 e 2 já foram feitas; ou quando as etapas 1 a 3 estiverem concluídas e não houver mais dúvidas.
+${isFirstReply ? "- Esta é a sua PRIMEIRA mensagem nesta conversa: siga as etapas 1 e 2 e marque handoff=false, a não ser que o lead peça para falar com uma pessoa, traga dúvida de saúde ou reclame." : ""}
 ${finalTurn ? "- ESTA É A ÚLTIMA MENSAGEM: marque handoff=true com handoff_reason='Qualificação concluída'. Em reply, apenas agradeça brevemente." : ""}
 - Em goal, inclua também a região ou detalhes citados e se mandou foto.
 - Extraia do histórico: procedure (procedimento de interesse), experience (se já fez antes), goal (o que busca). Use null quando não souber.
@@ -113,7 +121,7 @@ ${finalTurn ? "- ESTA É A ÚLTIMA MENSAGEM: marque handoff=true com handoff_rea
     messages,
     output: Output.object({ schema }),
     providerOptions: { openai: AI_OPTIONS },
-    abortSignal: AbortSignal.timeout(14_000),
+    abortSignal: AbortSignal.timeout(12_000),
   });
   const out: AiDecision = await result.output;
   if (finalTurn) out.handoff = true;
