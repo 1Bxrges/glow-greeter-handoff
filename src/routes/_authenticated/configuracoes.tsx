@@ -57,6 +57,7 @@ function SettingsForm() {
       return data;
     },
   });
+  const audios = useAudios();
   const [form, setForm] = useState<Settings | null>(null);
   const [saving, setSaving] = useState(false);
   const audios = useQuery({
@@ -75,7 +76,7 @@ function SettingsForm() {
   async function save() {
     setSaving(true);
     const { id, updated_at, ...rest } = form!;
-    const { error } = await supabase.from("clinic_settings").update({ ...rest, max_ai_replies: Math.min(5, Math.max(1, rest.max_ai_replies)), updated_at: new Date().toISOString() }).eq("id", 1);
+    const { error } = await supabase.from("clinic_settings").update({ ...rest, max_ai_replies: Math.min(5, Math.max(1, rest.max_ai_replies)), reply_delay_seconds: Math.min(110, Math.max(0, rest.reply_delay_seconds)), followup_minutes: Math.min(600, Math.max(5, rest.followup_minutes)), updated_at: new Date().toISOString() }).eq("id", 1);
     setSaving(false);
     if (error) {
       toast.error("Não foi possível salvar", { description: error.message });
@@ -129,6 +130,10 @@ function SettingsForm() {
         <F label="Quantas respostas a IA dá antes de passar para você">
           <Input type="number" min={1} max={5} className="w-24" value={form.max_ai_replies} onChange={(e) => set("max_ai_replies", Number(e.target.value) || 1)} />
         </F>
+        <F label="Esperar quantos segundos antes da IA responder (0 = na hora, até 110)">
+          <Input type="number" min={0} max={110} className="w-24" value={form.reply_delay_seconds} onChange={(e) => set("reply_delay_seconds", Number(e.target.value) || 0)} />
+        </F>
+        {form.reply_delay_seconds > 0 && <p className="text-xs text-muted-foreground">A conferência acontece a cada minuto, então a resposta sai entre {form.reply_delay_seconds}s e {form.reply_delay_seconds + 60}s.</p>}
         <div className="flex items-center justify-between">
           <div>
             <p className="font-semibold">Mandar mensagem de passagem</p>
@@ -174,6 +179,32 @@ function SettingsForm() {
       </Card>
 
       <AudiosCard audios={audios.data ?? []} onDeleted={(id) => { if (form.followup_audio_id === id) set("followup_audio_id", null); }} />
+
+      <Card>
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="font-semibold">Aviso "ainda em atendimento"</p>
+            <p className="text-sm text-muted-foreground">Se a conversa ficar esperando por você e ninguém responder, a IA manda um aviso uma única vez.</p>
+          </div>
+          <Switch checked={form.followup_enabled} onCheckedChange={(v) => set("followup_enabled", v)} />
+        </div>
+        {form.followup_enabled && (
+          <>
+            <F label="Depois de quantos minutos esperando">
+              <Input type="number" min={5} className="w-24" value={form.followup_minutes} onChange={(e) => set("followup_minutes", Number(e.target.value) || 20)} />
+            </F>
+            <F label="Áudio do aviso">
+              <select className="h-10 w-full rounded-md border bg-background px-3 text-sm" value={form.followup_audio_id ?? ""} onChange={(e) => set("followup_audio_id", e.target.value || null)}>
+                <option value="">Nenhum (mandar o texto abaixo)</option>
+                {audios.data?.map((a) => <option key={a.id} value={a.id}>{a.title}</option>)}
+              </select>
+            </F>
+            {!form.followup_audio_id && <F label="Texto do aviso"><Textarea rows={2} value={form.followup_text} onChange={(e) => set("followup_text", e.target.value)} /></F>}
+          </>
+        )}
+      </Card>
+
+      <AudioLibrary />
 
       <div className="flex justify-end">
         <Button className="rounded-full px-6" onClick={save} disabled={saving}>{saving ? "Salvando…" : "Salvar"}</Button>
@@ -267,6 +298,32 @@ function AudiosCard({ audios, onDeleted }: { audios: Audio[]; onDeleted: (id: st
         <F label="Arquivo"><Input ref={fileInput} type="file" accept=".ogg,.opus,.mp3,.m4a,.aac,.amr,audio/*" onChange={(e) => setFile(e.target.files?.[0] ?? null)} /></F>
       </div>
       <F label="Quando usar"><Textarea rows={2} value={useWhen} placeholder="Logo depois de o lead dizer qual procedimento quer" onChange={(e) => setUseWhen(e.target.value)} /></F>
+      <Card>
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="font-semibold">Aviso "ainda em atendimento"</p>
+            <p className="text-sm text-muted-foreground">Se a conversa ficar esperando por você e ninguém responder, a IA manda um aviso uma única vez.</p>
+          </div>
+          <Switch checked={form.followup_enabled} onCheckedChange={(v) => set("followup_enabled", v)} />
+        </div>
+        {form.followup_enabled && (
+          <>
+            <F label="Depois de quantos minutos esperando">
+              <Input type="number" min={5} className="w-24" value={form.followup_minutes} onChange={(e) => set("followup_minutes", Number(e.target.value) || 20)} />
+            </F>
+            <F label="Áudio do aviso">
+              <select className="h-10 w-full rounded-md border bg-background px-3 text-sm" value={form.followup_audio_id ?? ""} onChange={(e) => set("followup_audio_id", e.target.value || null)}>
+                <option value="">Nenhum (mandar o texto abaixo)</option>
+                {audios.data?.map((a) => <option key={a.id} value={a.id}>{a.title}</option>)}
+              </select>
+            </F>
+            {!form.followup_audio_id && <F label="Texto do aviso"><Textarea rows={2} value={form.followup_text} onChange={(e) => set("followup_text", e.target.value)} /></F>}
+          </>
+        )}
+      </Card>
+
+      <AudioLibrary />
+
       <div className="flex justify-end">
         <Button type="button" variant="outline" className="rounded-full" onClick={add} disabled={busy}><Upload className="h-4 w-4" /> {busy ? "Enviando…" : "Adicionar áudio"}</Button>
       </div>
@@ -279,4 +336,77 @@ function Card({ children }: { children: React.ReactNode }) {
 }
 function F({ label, children }: { label: string; children: React.ReactNode }) {
   return <div className="space-y-1.5"><Label>{label}</Label>{children}</div>;
+}
+
+function useAudios() {
+  return useQuery({
+    queryKey: ["clinic_audios"],
+    queryFn: async () => {
+      const { data, error } = await supabase.from("clinic_audios").select("*").order("created_at");
+      if (error) throw error;
+      return data;
+    },
+  });
+}
+
+function AudioLibrary() {
+  const qc = useQueryClient();
+  const audios = useAudios();
+  const [title, setTitle] = useState("");
+  const [useWhen, setUseWhen] = useState("");
+  const [file, setFile] = useState<File | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [playing, setPlaying] = useState<string | null>(null);
+
+  async function add() {
+    if (!file || !title.trim()) return toast.error("Dê um nome e escolha o arquivo de áudio");
+    setBusy(true);
+    const path = `${crypto.randomUUID()}-${file.name.replace(/[^\w.-]/g, "_")}`;
+    const up = await supabase.storage.from("clinic-audios").upload(path, file, { contentType: file.type || "audio/ogg" });
+    if (up.error) { setBusy(false); return toast.error("Não foi possível enviar o áudio", { description: up.error.message }); }
+    const { error } = await supabase.from("clinic_audios").insert({ title: title.trim(), use_when: useWhen.trim(), storage_path: path, mime_type: file.type || "audio/ogg" });
+    setBusy(false);
+    if (error) return toast.error("Não foi possível salvar", { description: error.message });
+    setTitle(""); setUseWhen(""); setFile(null);
+    toast.success("Áudio adicionado");
+    qc.invalidateQueries({ queryKey: ["clinic_audios"] });
+  }
+
+  async function remove(a: { id: string; storage_path: string }) {
+    await supabase.storage.from("clinic-audios").remove([a.storage_path]);
+    await supabase.from("clinic_audios").delete().eq("id", a.id);
+    qc.invalidateQueries({ queryKey: ["clinic_audios"] });
+  }
+
+  async function play(a: { id: string; storage_path: string }) {
+    const { data } = await supabase.storage.from("clinic-audios").createSignedUrl(a.storage_path, 600);
+    if (data) { setPlaying(a.id); new Audio(data.signedUrl).play(); }
+  }
+
+  return (
+    <Card>
+      <div>
+        <p className="font-semibold">Áudios da doutora</p>
+        <p className="text-sm text-muted-foreground">A IA envia o áudio quando o assunto combinar com "quando usar" — no máximo uma vez por conversa. Áudios gravados no WhatsApp (.ogg/.opus) chegam como mensagem de voz, sem "encaminhada".</p>
+      </div>
+      {audios.data?.map((a) => (
+        <div key={a.id} className="flex items-center justify-between gap-3 rounded-xl border p-3">
+          <div className="min-w-0">
+            <p className="truncate font-medium">{a.title}</p>
+            <p className="truncate text-xs text-muted-foreground">Quando usar: {a.use_when || "—"}</p>
+          </div>
+          <div className="flex gap-2">
+            <Button size="sm" variant="outline" onClick={() => play(a)}>{playing === a.id ? "Ouvir de novo" : "Ouvir"}</Button>
+            <Button size="sm" variant="ghost" onClick={() => remove(a)}>Remover</Button>
+          </div>
+        </div>
+      ))}
+      <div className="grid gap-3 rounded-xl bg-muted/40 p-3">
+        <F label="Nome do áudio"><Input placeholder="Ex.: Dra. Jennifer explica o botox labial" value={title} onChange={(e) => setTitle(e.target.value)} /></F>
+        <F label="Quando usar"><Input placeholder="Ex.: quando perguntarem sobre botox labial" value={useWhen} onChange={(e) => setUseWhen(e.target.value)} /></F>
+        <Input type="file" accept="audio/*,.ogg,.opus" onChange={(e) => setFile(e.target.files?.[0] ?? null)} />
+        <div className="flex justify-end"><Button variant="outline" onClick={add} disabled={busy}>{busy ? "Enviando…" : "Adicionar áudio"}</Button></div>
+      </div>
+    </Card>
+  );
 }
