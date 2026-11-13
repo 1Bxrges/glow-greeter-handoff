@@ -11,7 +11,7 @@ type ClinicAudio = Database["public"]["Tables"]["clinic_audios"]["Row"];
 export const AUDIO_BUCKET = "clinic-audios";
 /** The worker only keeps running ~30s after answering the webhook: short waits happen inline,
  * longer ones are picked up by the every-minute job once the message is old enough. */
-export const MAX_INLINE_DELAY_SECONDS = 15;
+export const MAX_INLINE_DELAY_SECONDS = 8;
 export const MAX_REPLY_DELAY_SECONDS = 120;
 /** Older lead messages are passed to the team instead of being answered late by the AI. */
 export const STALE_REPLY_MINUTES = 10;
@@ -189,12 +189,10 @@ async function handleInbound(db: DB, value: any) {
 
 /** Claims and answers one pending inbound message. Safe to call repeatedly. */
 export async function processReply(db: DB, messageId: string) {
-  const [{ data: pre }, { data: delaySet }] = await Promise.all([
-    db.from("messages").select("created_at").eq("id", messageId).maybeSingle(),
-    db.from("clinic_settings").select("reply_delay_seconds").eq("id", 1).single(),
-  ]);
+  const { data: delaySet } = await db.from("clinic_settings").select("reply_delay_seconds").eq("id", 1).single();
   const delaySeconds = Math.min(Math.max(delaySet?.reply_delay_seconds ?? 0, 0), MAX_REPLY_DELAY_SECONDS);
-  if (pre && delaySeconds > MAX_INLINE_DELAY_SECONDS && !replyIsDue(pre.created_at, delaySeconds)) return; // the job answers it later
+  // The server is cut off ~30s after the webhook is answered, so the wait never goes past
+  // MAX_INLINE_DELAY_SECONDS here: a longer setting would leave the lead without any reply.
   const staleBefore = new Date(Date.now() - 2 * 60_000).toISOString();
   const { data: claimed, error: claimErr } = await db
     .from("messages")
@@ -227,10 +225,11 @@ export async function processReply(db: DB, messageId: string) {
   }
 
   // Human-like pause, counted from when the lead wrote. Retries of old messages don't wait again.
-  const delayMs = delaySeconds * 1000;
+  const delayMs = Math.min(delaySeconds, MAX_INLINE_DELAY_SECONDS) * 1000;
   const waitMs = delayMs - (Date.now() - new Date(claimed.created_at).getTime());
   if (waitMs > 500) {
-    if (claimed.wa_message_id) await showTyping(claimed.wa_message_id);
+    // Fire and forget: the "digitando…" call must never hold up the reply.
+    if (claimed.wa_message_id) void showTyping(claimed.wa_message_id);
     await sleep(waitMs);
     // Someone may have taken over while we waited.
     const { data: fresh, error: fErr } = await db.from("conversations").select("mode").eq("id", conv.id).single();

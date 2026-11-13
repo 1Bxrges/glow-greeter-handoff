@@ -113,7 +113,7 @@ ${finalTurn ? "- ESTA É A ÚLTIMA MENSAGEM: marque handoff=true com handoff_rea
     messages,
     output: Output.object({ schema }),
     providerOptions: { openai: AI_OPTIONS },
-    abortSignal: AbortSignal.timeout(20_000),
+    abortSignal: AbortSignal.timeout(14_000),
   });
   const out: AiDecision = await result.output;
   if (finalTurn) out.handoff = true;

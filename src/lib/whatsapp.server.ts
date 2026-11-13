@@ -66,6 +66,7 @@ export async function showTyping(waMessageId: string): Promise<void> {
         message_id: waMessageId,
         typing_indicator: { type: "text" },
       }),
+      signal: AbortSignal.timeout(3000),
     });
     if (!res.ok) console.warn(`typing indicator not accepted [${res.status}]`);
   } catch (e) {
