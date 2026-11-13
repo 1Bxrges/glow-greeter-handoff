@@ -46,6 +46,7 @@ export async function runSecretary(opts: {
   aiRepliesSoFar: number;
   maxAiReplies: number;
   contactName: string | null;
+  audios?: { id: string; title: string; use_when: string }[];
 }): Promise<AiDecision> {
   const apiKey = process.env['LOVABLE_API_KEY'];
   if (!apiKey) throw new Error("LOVABLE_API_KEY ausente");
@@ -89,6 +90,9 @@ Regras:
 - Marque handoff=true (e explique em handoff_reason) se o lead pedir preço/valores, pedir para falar com uma pessoa, quiser agendar, pedir indicação ou avaliação médica ("você me recomenda?"), trouxer dúvida de saúde, reclamar, ou se o assunto não for estética. Também quando as etapas 1 a 3 estiverem concluídas e não houver mais dúvidas.
 ${finalTurn ? "- ESTA É A ÚLTIMA MENSAGEM: marque handoff=true com handoff_reason='Qualificação concluída'. Em reply, apenas agradeça brevemente." : ""}
 - Em goal, inclua também a região ou detalhes citados e se mandou foto.
+${opts.audios?.length ? `- Áudios gravados pela doutora que você pode enviar (no máximo um por vez, só quando o assunto bater com "quando usar"; senão audio_id=null):
+${opts.audios.map((a) => `  id=${a.id} | ${a.title} | quando usar: ${a.use_when || a.title}`).join("\n")}
+  Ao enviar um áudio, escreva em reply uma frase curta que acompanhe (ex.: "A doutora gravou um áudio explicando 👇").` : "- Sempre use audio_id=null."}
 - Extraia do histórico: procedure (procedimento de interesse), experience (se já fez antes), goal (o que busca). Use null quando não souber.
 - Em audio use null quando não for enviar áudio${audios.length ? "" : " (não há áudios cadastrados, use sempre null)"}.`;
 
@@ -132,6 +136,7 @@ ${finalTurn ? "- ESTA É A ÚLTIMA MENSAGEM: marque handoff=true com handoff_rea
     }
   }
   if (finalTurn) out.handoff = true;
+  if (out.audio_id && !opts.audios?.some((a) => a.id === out.audio_id)) out.audio_id = null;
   if (out.audio != null && (out.audio < 1 || out.audio > audios.length)) out.audio = null;
   return out;
 }
