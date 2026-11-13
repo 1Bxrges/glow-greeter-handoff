@@ -18,7 +18,7 @@ import { deleteAudio, getAudioUrl, prepareAudioUpload } from "@/lib/panel.functi
 type Settings = Database["public"]["Tables"]["clinic_settings"]["Row"];
 type Audio = Database["public"]["Tables"]["clinic_audios"]["Row"];
 
-const MAX_DELAY = 8;
+const MAX_DELAY = 0;
 const AUDIO_BUCKET = "clinic-audios";
 // Formats WhatsApp accepts. OGG (Opus) goes out as a voice note; the others as an audio file.
 const AUDIO_TYPES: Record<string, string> = { ogg: "audio/ogg", opus: "audio/ogg", mp3: "audio/mpeg", m4a: "audio/mp4", aac: "audio/aac", amr: "audio/amr" };
@@ -145,7 +145,7 @@ function SettingsForm() {
         <F label={`Esperar antes de responder (segundos, de 0 a ${MAX_DELAY})`}>
           <Input type="number" min={0} max={MAX_DELAY} className="w-24" value={form.reply_delay_seconds} onChange={(e) => set("reply_delay_seconds", Math.min(MAX_DELAY, Math.max(0, Math.round(Number(e.target.value)) || 0)))} />
         </F>
-        <p className="text-sm text-muted-foreground">A IA aparece como “digitando…” e responde depois desse tempo. O máximo é 8 segundos: o servidor encerra o trabalho pouco depois de receber a mensagem, e uma espera maior deixava o lead sem resposta. Se o lead mandar várias mensagens seguidas, ela responde tudo de uma vez.</p>
+        <p className="text-sm text-muted-foreground">A IA aparece como “digitando…” e responde depois desse tempo. Por enquanto fica desligado: o servidor só tem uns 5 segundos para responder cada mensagem do WhatsApp, e qualquer espera fazia a IA não responder. Se o lead mandar várias mensagens seguidas, ela responde tudo de uma vez.</p>
       </Card>
 
       <Card>
