@@ -26,9 +26,9 @@ const AUDIO_TYPES: Record<string, string> = { ogg: "audio/ogg", opus: "audio/ogg
 export const Route = createFileRoute("/_authenticated/configuracoes")({
   head: () => ({
     meta: [
-      { title: "Configurações — Secretária IA" },
+      { title: "Configurações — Buzzina" },
       { name: "description", content: "Ajuste procedimentos, perguntas e o tom da secretária de IA." },
-      { property: "og:title", content: "Configurações — Secretária IA" },
+      { property: "og:title", content: "Configurações — Buzzina" },
       { property: "og:description", content: "Ajuste procedimentos, perguntas e o tom da secretária de IA." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },

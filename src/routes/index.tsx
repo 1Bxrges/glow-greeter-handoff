@@ -6,9 +6,9 @@ export const Route = createFileRoute("/")({
   },
   head: () => ({
     meta: [
-      { title: "Secretária IA — Atendimentos da clínica" },
+      { title: "Buzzina — Atendimento por IA" },
       { name: "description", content: "Acompanhe em tempo real o primeiro contato da IA com os leads no WhatsApp." },
-      { property: "og:title", content: "Secretária IA — Atendimentos da clínica" },
+      { property: "og:title", content: "Buzzina — Atendimento por IA" },
       { property: "og:description", content: "Acompanhe em tempo real o primeiro contato da IA com os leads no WhatsApp." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },

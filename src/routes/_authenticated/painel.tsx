@@ -3,7 +3,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
-import { Bell, Bot, Check, CheckCheck, Hand, RotateCcw, Send, Sparkles, User, X } from "lucide-react";
+import { Bell, Bot, Check, CheckCheck, Hand, RotateCcw, Send, User, X } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import type { Database } from "@/integrations/supabase/types";
 import { Button } from "@/components/ui/button";
@@ -20,9 +20,9 @@ type Message = Database["public"]["Tables"]["messages"]["Row"];
 export const Route = createFileRoute("/_authenticated/painel")({
   head: () => ({
     meta: [
-      { title: "Atendimentos — Secretária IA" },
+      { title: "Atendimentos — Buzzina" },
       { name: "description", content: "Conversas do WhatsApp atendidas pela IA e as que precisam de você." },
-      { property: "og:title", content: "Atendimentos — Secretária IA" },
+      { property: "og:title", content: "Atendimentos — Buzzina" },
       { property: "og:description", content: "Conversas do WhatsApp atendidas pela IA e as que precisam de você." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
@@ -162,7 +162,7 @@ function Panel() {
       {current ? <ConversationView conv={current} key={current.id} /> : (
         <div className="flex flex-1 items-center justify-center bg-chat-bg">
           <div className="max-w-xs text-center">
-            <Sparkles className="mx-auto h-8 w-8 text-primary" />
+            <img src="/brand/buzzina-symbol-orange.png" alt="" aria-hidden className="mx-auto h-14 w-auto" />
             <h2 className="mt-3 text-xl font-semibold">Escolha uma conversa</h2>
             <p className="mt-1 text-sm text-muted-foreground">A IA faz o primeiro contato e te avisa aqui quando for a sua vez.</p>
           </div>

@@ -11,9 +11,9 @@ import { Label } from "@/components/ui/label";
 export const Route = createFileRoute("/auth")({
   head: () => ({
     meta: [
-      { title: "Entrar — Secretária IA" },
+      { title: "Entrar — Buzzina" },
       { name: "description", content: "Acesso da equipe da clínica ao painel de atendimentos." },
-      { property: "og:title", content: "Entrar — Secretária IA" },
+      { property: "og:title", content: "Entrar — Buzzina" },
       { property: "og:description", content: "Acesso da equipe da clínica ao painel de atendimentos." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
@@ -65,12 +65,23 @@ function AuthPage() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background px-4">
+    <div className="flex min-h-screen flex-col bg-background lg:flex-row">
+      {/* Brand panel: orange with the symbol as a watermark, like Buzzina's own pieces. */}
+      <aside className="relative flex shrink-0 flex-col items-center justify-center overflow-hidden bg-primary px-6 py-10 text-center text-primary-foreground lg:w-[44%] lg:py-16">
+        <img src="/brand/buzzina-symbol-white.png" alt="" aria-hidden className="pointer-events-none absolute -left-10 -top-12 w-56 -rotate-12 opacity-10 lg:w-80" />
+        <img src="/brand/buzzina-symbol-white.png" alt="" aria-hidden className="pointer-events-none absolute -bottom-16 -right-10 w-64 rotate-[165deg] opacity-10 lg:w-96" />
+        <p className="relative text-[11px] font-medium uppercase tracking-[0.3em] text-primary-foreground/90">Assessoria de marketing</p>
+        <img src="/brand/buzzina-symbol-white.png" alt="" aria-hidden className="relative mt-6 hidden h-28 w-auto lg:block" />
+        <img src="/brand/buzzina-wordmark-white.png" alt="Buzzina" className="relative mt-4 h-10 w-auto lg:h-14" />
+        <h1 className="relative mt-6 max-w-xs text-2xl font-bold leading-tight lg:mt-10 lg:text-4xl">Atendimento por IA para a sua clínica.</h1>
+        <p className="relative mt-3 max-w-xs text-sm text-primary-foreground/90">A IA faz o primeiro contato no WhatsApp e te chama na hora de assumir.</p>
+        <p className="relative mt-10 hidden text-[11px] font-medium uppercase tracking-[0.3em] text-primary-foreground/90 lg:block">Referência em clínicas</p>
+      </aside>
+      <div className="flex flex-1 items-center justify-center px-4 py-10">
       <div className="w-full max-w-sm">
-        <div className="mb-8 text-center">
-          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-primary">Secretária IA</p>
-          <h1 className="mt-2 text-3xl font-semibold text-foreground">Atendimentos da clínica</h1>
-          <p className="mt-2 text-sm text-muted-foreground">Acompanhe o primeiro contato da IA e assuma quando ela te chamar.</p>
+        <div className="mb-6 text-center">
+          <h2 className="text-2xl font-semibold text-foreground">Entrar no painel</h2>
+          <p className="mt-1 text-sm text-muted-foreground">Acompanhe as conversas e assuma quando a IA te chamar.</p>
         </div>
         <div className="rounded-2xl border bg-card p-6 shadow-soft">
           <div className="space-y-2">
@@ -101,6 +112,7 @@ function AuthPage() {
             {mode === "in" ? "Primeiro acesso? Criar conta" : "Já tenho conta. Entrar"}
           </button>
         </div>
+      </div>
       </div>
     </div>
   );
