@@ -9,8 +9,14 @@ type DB = SupabaseClient<Database>;
 type ClinicAudio = Database["public"]["Tables"]["clinic_audios"]["Row"];
 
 export const AUDIO_BUCKET = "clinic-audios";
-/** The worker only keeps running ~30s after answering the webhook, so the wait is capped. */
-export const MAX_REPLY_DELAY_SECONDS = 15;
+/** The worker only keeps running ~30s after answering the webhook: short waits happen inline,
+ * longer ones are picked up by the every-minute job once the message is old enough. */
+export const MAX_INLINE_DELAY_SECONDS = 15;
+export const MAX_REPLY_DELAY_SECONDS = 120;
+
+export function replyIsDue(createdAt: string, delaySeconds: number, now = Date.now()) {
+  return now - new Date(createdAt).getTime() >= Math.max(0, delaySeconds) * 1000;
+}
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 /** Saves an outbound row, sends it, and records the result. Returns the send result. */
@@ -181,6 +187,12 @@ async function handleInbound(db: DB, value: any) {
 
 /** Claims and answers one pending inbound message. Safe to call repeatedly. */
 export async function processReply(db: DB, messageId: string) {
+  const [{ data: pre }, { data: delaySet }] = await Promise.all([
+    db.from("messages").select("created_at").eq("id", messageId).maybeSingle(),
+    db.from("clinic_settings").select("reply_delay_seconds").eq("id", 1).single(),
+  ]);
+  const delaySeconds = Math.min(Math.max(delaySet?.reply_delay_seconds ?? 0, 0), MAX_REPLY_DELAY_SECONDS);
+  if (pre && delaySeconds > MAX_INLINE_DELAY_SECONDS && !replyIsDue(pre.created_at, delaySeconds)) return; // the job answers it later
   const staleBefore = new Date(Date.now() - 2 * 60_000).toISOString();
   const { data: claimed, error: claimErr } = await db
     .from("messages")
@@ -207,7 +219,7 @@ export async function processReply(db: DB, messageId: string) {
   if (!aiAllowedFor(conv.wa_phone, settings.test_mode, settings.test_numbers)) return finish("skipped");
 
   // Human-like pause, counted from when the lead wrote. Retries of old messages don't wait again.
-  const delayMs = Math.min(Math.max(settings.reply_delay_seconds, 0), MAX_REPLY_DELAY_SECONDS) * 1000;
+  const delayMs = delaySeconds * 1000;
   const waitMs = delayMs - (Date.now() - new Date(claimed.created_at).getTime());
   if (waitMs > 500) {
     if (claimed.wa_message_id) await showTyping(claimed.wa_message_id);
@@ -409,4 +421,19 @@ export async function sendDueFollowups(db: DB): Promise<number> {
     else console.error("follow-up send failed", sent.error);
   }
   return count;
+}
+
+/** Answers pending lead messages whose wait time has passed. Run by the every-minute job. */
+export async function processDueReplies(db: DB) {
+  const { data: settings, error } = await db.from("clinic_settings").select("reply_delay_seconds").eq("id", 1).single();
+  if (error) throw error;
+  const dueBefore = new Date(Date.now() - Math.max(0, settings.reply_delay_seconds) * 1000).toISOString();
+  const { data: due } = await db
+    .from("messages")
+    .select("id")
+    .eq("reply_state", "pending")
+    .lte("created_at", dueBefore)
+    .order("created_at", { ascending: true })
+    .limit(5);
+  for (const r of due ?? []) await processReply(db, r.id);
 }

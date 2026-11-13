@@ -10,9 +10,14 @@ export const Route = createFileRoute("/api/public/cron/followups")({
         const denied = await authenticateCronRequest(request);
         if (denied) return denied;
         const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-        const { sendDueFollowups } = await import("@/lib/webhook-processor.server");
-        const sent = await sendDueFollowups(supabaseAdmin);
-        return Response.json({ sent });
+        const { sendDueFollowups, processDueReplies } = await import("@/lib/webhook-processor.server");
+        const { runInBackground } = await import("@/lib/request-context.server");
+        // The scheduler hangs up after a few seconds: the AI work runs after the response.
+        await runInBackground(async () => {
+          await processDueReplies(supabaseAdmin);
+          await sendDueFollowups(supabaseAdmin);
+        });
+        return Response.json({ ok: true });
       },
     },
   },
