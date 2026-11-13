@@ -18,7 +18,7 @@ import { deleteAudio, getAudioUrl, prepareAudioUpload } from "@/lib/panel.functi
 type Settings = Database["public"]["Tables"]["clinic_settings"]["Row"];
 type Audio = Database["public"]["Tables"]["clinic_audios"]["Row"];
 
-const MAX_DELAY = 15;
+const MAX_DELAY = 120;
 const AUDIO_BUCKET = "clinic-audios";
 // Formats WhatsApp accepts. OGG (Opus) goes out as a voice note; the others as an audio file.
 const AUDIO_TYPES: Record<string, string> = { ogg: "audio/ogg", opus: "audio/ogg", mp3: "audio/mpeg", m4a: "audio/mp4", aac: "audio/aac", amr: "audio/amr" };
@@ -145,7 +145,7 @@ function SettingsForm() {
         <F label={`Esperar antes de responder (segundos, de 0 a ${MAX_DELAY})`}>
           <Input type="number" min={0} max={MAX_DELAY} className="w-24" value={form.reply_delay_seconds} onChange={(e) => set("reply_delay_seconds", Math.min(MAX_DELAY, Math.max(0, Math.round(Number(e.target.value)) || 0)))} />
         </F>
-        <p className="text-sm text-muted-foreground">A IA aparece como “digitando…” e responde depois desse tempo, para parecer uma pessoa. Se o lead mandar várias mensagens seguidas, ela responde tudo de uma vez.</p>
+        <p className="text-sm text-muted-foreground">Até 15s a IA aparece como “digitando…”; acima disso ela confere a cada minuto, então com 47s a resposta sai entre 47s e cerca de 1min45. Se o lead mandar várias mensagens seguidas, ela responde tudo de uma vez.</p>
       </Card>
 
       <Card>
@@ -195,11 +195,11 @@ function AudiosCard({ audios, onDeleted }: { audios: Audio[]; onDeleted: (id: st
   const [playing, setPlaying] = useState<{ id: string; url: string } | null>(null);
 
   async function add() {
-    if (!file || !title.trim()) return toast.error("Escolha o arquivo e dê um nome ao áudio");
+    if (!file || !title.trim()) { toast.error("Escolha o arquivo e dê um nome ao áudio"); return; }
     const ext = file.name.split(".").pop()?.toLowerCase() ?? "";
     const mime = AUDIO_TYPES[ext];
-    if (!mime) return toast.error("Formato não aceito pelo WhatsApp", { description: "Use OGG, MP3, M4A, AAC ou AMR." });
-    if (file.size > 16 * 1024 * 1024) return toast.error("Áudio grande demais (máximo 16 MB)");
+    if (!mime) { toast.error("Formato não aceito pelo WhatsApp", { description: "Use OGG, MP3, M4A, AAC ou AMR." }); return; }
+    if (file.size > 16 * 1024 * 1024) { toast.error("Áudio grande demais (máximo 16 MB)"); return; }
     setBusy(true);
     try {
       await prepare();

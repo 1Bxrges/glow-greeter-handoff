@@ -2,3 +2,6 @@
 - [x] Panel to follow conversations and take over
 - [ ] Optional later: AI scheduling (user said not needed for now)
 - [x] AI understands WhatsApp voice messages (transcribe audio)
+- [x] Reply delay set in Settings (long waits handled by the every-minute job)
+- [x] Recorded clinic audios the AI can send
+- [x] "Still in consultation" follow-up after X minutes waiting
