@@ -181,12 +181,6 @@ async function handleInbound(db: DB, value: any) {
 
 /** Claims and answers one pending inbound message. Safe to call repeatedly. */
 export async function processReply(db: DB, messageId: string) {
-  // Reply delay: wait until the lead's message is old enough (the minute job picks it up).
-  const [{ data: pre }, { data: delaySet }] = await Promise.all([
-    db.from("messages").select("created_at").eq("id", messageId).maybeSingle(),
-    db.from("clinic_settings").select("reply_delay_seconds").eq("id", 1).single(),
-  ]);
-  if (pre && delaySet && !replyIsDue(pre.created_at, delaySet.reply_delay_seconds)) return;
   const staleBefore = new Date(Date.now() - 2 * 60_000).toISOString();
   const { data: claimed, error: claimErr } = await db
     .from("messages")
@@ -243,7 +237,6 @@ export async function processReply(db: DB, messageId: string) {
       aiRepliesSoFar: conv.ai_replies,
       maxAiReplies: settings.max_ai_replies,
       contactName: conv.contact_name,
-      audios,
     });
   } catch (e) {
     console.error("AI error", e);
@@ -416,86 +409,4 @@ export async function sendDueFollowups(db: DB): Promise<number> {
     else console.error("follow-up send failed", sent.error);
   }
   return count;
-}
-
-export function replyIsDue(createdAt: string, delaySeconds: number, now = Date.now()) {
-  return now - new Date(createdAt).getTime() >= Math.max(0, delaySeconds) * 1000;
-}
-
-type Audio = { id: string; title: string; storage_path: string; mime_type: string };
-
-/** Sends a recorded clinic audio and records it in the conversation. */
-export async function sendClinicAudio(db: DB, convId: string, phone: string, audio: Audio, sender: "ia" | "humano") {
-  const { data: signed, error: sErr } = await db.storage.from("clinic-audios").createSignedUrl(audio.storage_path, 3600);
-  if (sErr || !signed) throw sErr ?? new Error("sem link do áudio");
-  const body = `🎤 Áudio enviado: ${audio.title}`;
-  const { data: row, error } = await db
-    .from("messages")
-    .insert({ conversation_id: convId, direction: "out", sender, body, status: "sending", audio_id: audio.id })
-    .select("id")
-    .single();
-  if (error) throw error;
-  const sent = await sendWhatsAppAudio(phone, signed.signedUrl, audio.mime_type);
-  if (!sent.ok) {
-    await db.from("messages").update({ status: sent.definite ? "failed" : "unknown", error: sent.error }).eq("id", row.id);
-    return false;
-  }
-  await db.from("messages").update({ wa_message_id: sent.waMessageId, status: "accepted" }).eq("id", row.id);
-  await applyStatuses(db, sent.waMessageId);
-  await db.from("conversations").update({ last_message_at: new Date().toISOString(), last_message_preview: body }).eq("id", convId);
-  return true;
-}
-
-/** Runs every minute: delayed AI replies and the "still in consultation" follow-up. */
-export async function runTick(db: DB) {
-  const { data: settings, error } = await db.from("clinic_settings").select("*").eq("id", 1).single();
-  if (error) throw error;
-
-  const dueBefore = new Date(Date.now() - settings.reply_delay_seconds * 1000).toISOString();
-  const { data: due } = await db
-    .from("messages")
-    .select("id")
-    .eq("reply_state", "pending")
-    .lte("created_at", dueBefore)
-    .order("created_at", { ascending: true })
-    .limit(10);
-  for (const r of due ?? []) await processReply(db, r.id);
-
-  if (!settings.followup_enabled) return;
-  const waitedSince = new Date(Date.now() - settings.followup_minutes * 60_000).toISOString();
-  const { data: convs } = await db
-    .from("conversations")
-    .select("id, wa_phone, handoff_at")
-    .eq("mode", "aguardando_humano")
-    .is("followup_sent_at", null)
-    .lte("handoff_at", waitedSince)
-    .gte("handoff_at", new Date(Date.now() - 20 * 3600_000).toISOString()) // stay inside WhatsApp's 24h window
-    .limit(5);
-  const audio = settings.followup_audio_id
-    ? (await db.from("clinic_audios").select("*").eq("id", settings.followup_audio_id).maybeSingle()).data
-    : null;
-  for (const c of convs ?? []) {
-    if (!aiAllowedFor(c.wa_phone, settings.test_mode, settings.test_numbers)) continue;
-    // Claim first so the follow-up goes out at most once.
-    const { data: claimed } = await db
-      .from("conversations")
-      .update({ followup_sent_at: new Date().toISOString() })
-      .eq("id", c.id)
-      .is("followup_sent_at", null)
-      .eq("mode", "aguardando_humano")
-      .select("id")
-      .maybeSingle();
-    if (!claimed) continue;
-    if (audio) {
-      await sendClinicAudio(db, c.id, c.wa_phone, audio, "ia");
-    } else if (settings.followup_text.trim()) {
-      const text = settings.followup_text.trim();
-      const { data: row } = await db.from("messages").insert({ conversation_id: c.id, direction: "out", sender: "ia", body: text, status: "sending" }).select("id").single();
-      const sent = await sendWhatsAppText(c.wa_phone, text);
-      if (row) {
-        await db.from("messages").update(sent.ok ? { wa_message_id: sent.waMessageId, status: "accepted" } : { status: sent.definite ? "failed" : "unknown", error: sent.error }).eq("id", row.id);
-      }
-      if (sent.ok) await db.from("conversations").update({ last_message_at: new Date().toISOString(), last_message_preview: text.slice(0, 140) }).eq("id", c.id);
-    }
-  }
 }
