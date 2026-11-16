@@ -27,9 +27,9 @@ export const Route = createFileRoute("/_authenticated/configuracoes")({
   head: () => ({
     meta: [
       { title: "Configurações — Buzzina" },
-      { name: "description", content: "Ajuste procedimentos, perguntas e o tom da secretária de IA." },
+      { name: "description", content: "Ajuste procedimentos, perguntas e o tom da IA que responde como a doutora." },
       { property: "og:title", content: "Configurações — Buzzina" },
-      { property: "og:description", content: "Ajuste procedimentos, perguntas e o tom da secretária de IA." },
+      { property: "og:description", content: "Ajuste procedimentos, perguntas e o tom da IA que responde como a doutora." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
     ],
@@ -88,7 +88,7 @@ function SettingsForm() {
   return (
     <main className="mx-auto w-full max-w-2xl space-y-6 px-4 py-8">
       <div>
-        <h1 className="text-3xl font-semibold">Configurações da secretária</h1>
+        <h1 className="text-3xl font-semibold">Configurações da IA</h1>
         <p className="mt-1 text-sm text-muted-foreground">A IA faz o primeiro contato, faz as perguntas abaixo e passa a conversa para você.</p>
       </div>
 
@@ -118,7 +118,7 @@ function SettingsForm() {
       <Card>
         <div className="grid gap-4 sm:grid-cols-2">
           <F label="Nome da clínica"><Input value={form.clinic_name} onChange={(e) => set("clinic_name", e.target.value)} /></F>
-          <F label="Nome da secretária"><Input value={form.assistant_name} onChange={(e) => set("assistant_name", e.target.value)} /></F>
+          <F label="Nome da doutora (a IA escreve como ela)"><Input value={form.assistant_name} onChange={(e) => set("assistant_name", e.target.value)} /></F>
         </div>
         <F label="Tom de voz"><Textarea rows={2} value={form.tone} onChange={(e) => set("tone", e.target.value)} /></F>
         <F label="Procedimentos e pergunta específica (um por linha, no formato Procedimento: pergunta)"><Textarea rows={6} value={form.procedures} onChange={(e) => set("procedures", e.target.value)} /></F>
@@ -132,7 +132,7 @@ function SettingsForm() {
         <div className="flex items-center justify-between">
           <div>
             <p className="font-semibold">Mandar mensagem de passagem</p>
-            <p className="text-sm text-muted-foreground">Avisa o lead que a especialista vai continuar.</p>
+            <p className="text-sm text-muted-foreground">Última mensagem da IA, quando a conversa passa para a doutora.</p>
           </div>
           <Switch checked={form.send_handoff_message} onCheckedChange={(v) => set("send_handoff_message", v)} />
         </div>
