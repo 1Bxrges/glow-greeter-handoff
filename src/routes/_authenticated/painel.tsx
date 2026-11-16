@@ -3,7 +3,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
-import { Bell, Bot, Check, CheckCheck, Hand, RotateCcw, Send, User, X } from "lucide-react";
+import { Bell, Bot, Check, CheckCheck, Eraser, Hand, RotateCcw, Send, User, X } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import type { Database } from "@/integrations/supabase/types";
 import { Button } from "@/components/ui/button";
@@ -12,7 +12,8 @@ import { cn } from "@/lib/utils";
 import { TopBar } from "@/components/panel/TopBar";
 import { NoAccess, useIsStaff } from "@/components/panel/useStaff";
 import { MODE_META, beep, formatPhone, timeAgo, type Mode } from "@/components/panel/status";
-import { runFollowups, sendHumanReply } from "@/lib/panel.functions";
+import { resetTestConversation, runFollowups, sendHumanReply } from "@/lib/panel.functions";
+import { isTestNumber } from "@/lib/rules/test-mode";
 
 type Conversation = Database["public"]["Tables"]["conversations"]["Row"];
 type Message = Database["public"]["Tables"]["messages"]["Row"];
@@ -183,6 +184,7 @@ function StatusTicks({ m }: { m: Message }) {
 function ConversationView({ conv }: { conv: Conversation }) {
   const qc = useQueryClient();
   const send = useServerFn(sendHumanReply);
+  const reset = useServerFn(resetTestConversation);
   const [text, setText] = useState("");
   const [sending, setSending] = useState(false);
   const bottom = useRef<HTMLDivElement>(null);
@@ -196,6 +198,27 @@ function ConversationView({ conv }: { conv: Conversation }) {
     },
   });
   useEffect(() => { bottom.current?.scrollIntoView({ block: "end" }); }, [msgs.data?.length]);
+
+  const testNumbers = useQuery({
+    queryKey: ["test-numbers"],
+    queryFn: async () => {
+      const { data, error } = await supabase.from("clinic_settings").select("test_numbers").eq("id", 1).single();
+      if (error) throw error;
+      return data.test_numbers;
+    },
+  });
+  const isTest = testNumbers.data ? isTestNumber(conv.wa_phone, testNumbers.data) : false;
+
+  async function resetConversation() {
+    if (!window.confirm("Apagar esta conversa de teste e todas as mensagens? A próxima mensagem desse número começa do zero com a IA.")) return;
+    try {
+      await reset({ data: { conversationId: conv.id } });
+      toast.success("Conversa zerada. Pode mandar uma nova mensagem para testar.");
+      qc.invalidateQueries({ queryKey: ["conversations"] });
+    } catch (err) {
+      toast.error(String((err as Error).message));
+    }
+  }
 
   async function setMode(mode: Mode) {
     const patch: Partial<Conversation> = { mode };
@@ -232,6 +255,9 @@ function ConversationView({ conv }: { conv: Conversation }) {
             <p className="text-xs text-muted-foreground">{formatPhone(conv.wa_phone)}</p>
           </div>
           <div className="flex items-center gap-2">
+            {isTest && (
+              <Button size="sm" variant="outline" className="rounded-full" onClick={resetConversation} title="Só aparece para números de teste"><Eraser className="h-4 w-4" /> Zerar conversa</Button>
+            )}
             <span className={cn("inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium", meta.chip)}>
               <span className={cn("h-1.5 w-1.5 rounded-full", meta.dot)} /> {meta.label}
             </span>

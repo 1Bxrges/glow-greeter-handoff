@@ -90,3 +90,28 @@ export const runFollowups = createServerFn({ method: "POST" })
     const { sendDueFollowups } = await import("@/lib/webhook-processor.server");
     return { sent: await sendDueFollowups(supabaseAdmin) };
   });
+
+/**
+ * Deletes a test conversation and all its messages, so the next message from that number starts
+ * from zero with the AI. Only numbers on the test list can be reset, never a real lead.
+ */
+export const resetTestConversation = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown) => z.object({ conversationId: z.string().uuid() }).parse(input))
+  .handler(async ({ data, context }) => {
+    await assertStaff(context.supabase);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { isTestNumber } = await import("@/lib/rules/test-mode");
+    const [{ data: conv }, { data: settings, error: sErr }] = await Promise.all([
+      supabaseAdmin.from("conversations").select("id, wa_phone").eq("id", data.conversationId).maybeSingle(),
+      supabaseAdmin.from("clinic_settings").select("test_numbers").eq("id", 1).single(),
+    ]);
+    if (!conv) return { ok: true };
+    if (sErr) throw new Error(sErr.message);
+    if (!isTestNumber(conv.wa_phone, settings.test_numbers)) throw new Error("Só dá para zerar conversas de números de teste");
+    const { error: mErr } = await supabaseAdmin.from("messages").delete().eq("conversation_id", conv.id);
+    if (mErr) throw new Error(mErr.message);
+    const { error } = await supabaseAdmin.from("conversations").delete().eq("id", conv.id);
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });
