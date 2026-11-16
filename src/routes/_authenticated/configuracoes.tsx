@@ -152,13 +152,13 @@ function SettingsForm() {
         <div className="flex items-center justify-between">
           <div>
             <p className="font-semibold">Mensagem de espera</p>
-            <p className="text-sm text-muted-foreground">Se ninguém assumir a conversa no tempo abaixo, a IA manda um aviso para o lead não esfriar. Uma vez por conversa.</p>
+            <p className="text-sm text-muted-foreground">Depois que a conversa passa para a doutora, se ninguém responder o lead no tempo abaixo (contado da última mensagem dele), a IA manda um aviso para ele não esfriar. Uma vez por conversa.</p>
           </div>
           <Switch checked={form.followup_enabled} onCheckedChange={(v) => set("followup_enabled", v)} />
         </div>
         {form.followup_enabled && (
           <>
-            <F label="Enviar depois de quantos minutos esperando">
+            <F label="Minutos depois da última mensagem do lead">
               <Input type="number" min={1} max={300} className="w-24" value={form.followup_minutes} onChange={(e) => set("followup_minutes", Math.min(300, Math.max(1, Math.round(Number(e.target.value)) || 1)))} />
             </F>
             <F label="Texto da mensagem de espera"><Textarea rows={2} value={form.followup_text} onChange={(e) => set("followup_text", e.target.value)} /></F>

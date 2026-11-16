@@ -395,10 +395,11 @@ export async function sendDueFollowups(db: DB): Promise<number> {
     .select("id, wa_phone")
     .eq("mode", "aguardando_humano")
     .is("followup_sent_at", null)
-    .lt("handoff_at", dueBefore)
+    // Counted from the lead's last message: if they keep writing, the wait starts over.
+    .lt("last_inbound_at", dueBefore)
     .gt("handoff_at", notOlderThan)
     .gt("last_inbound_at", notOlderThan)
-    .order("handoff_at", { ascending: true })
+    .order("last_inbound_at", { ascending: true })
     .limit(5);
   if (error) throw error;
 
