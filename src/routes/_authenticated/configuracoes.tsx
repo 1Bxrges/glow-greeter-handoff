@@ -56,6 +56,9 @@ function SettingsForm() {
       if (error) throw error;
       return data;
     },
+    // Never refetch behind the user's back: it would overwrite what they are typing.
+    staleTime: Infinity,
+    refetchOnWindowFocus: false,
   });
   const [form, setForm] = useState<Settings | null>(null);
   const [saving, setSaving] = useState(false);
@@ -67,7 +70,7 @@ function SettingsForm() {
       return data;
     },
   });
-  useEffect(() => { if (q.data) setForm(q.data); }, [q.data]);
+  useEffect(() => { if (q.data) setForm((f) => f ?? q.data); }, [q.data]);
   if (!form) return <p className="p-8 text-sm text-muted-foreground">Carregando…</p>;
 
   const set = <K extends keyof Settings>(k: K, v: Settings[K]) => setForm({ ...form, [k]: v });
@@ -82,7 +85,8 @@ function SettingsForm() {
       return;
     }
     toast.success("Configurações salvas");
-    qc.invalidateQueries({ queryKey: ["settings"] });
+    qc.setQueryData(["settings"], form);
+    qc.invalidateQueries({ queryKey: ["test-numbers"] });
   }
 
   return (

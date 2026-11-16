@@ -75,15 +75,43 @@ function Panel() {
     },
   });
 
+  // Realtime changes are applied straight into the cache: no refetch of the whole list on every
+  // message or delivery status (that refetch storm is what made the panel slow).
   useEffect(() => {
+    let subscribedOnce = false;
     const ch = supabase
       .channel(`panel-${Math.random().toString(36).slice(2)}`)
-      .on("postgres_changes", { event: "*", schema: "public", table: "conversations" }, () => qc.invalidateQueries({ queryKey: ["conversations"] }))
-      .on("postgres_changes", { event: "*", schema: "public", table: "messages" }, (p) => {
-        const cid = (p.new as Message | undefined)?.conversation_id;
-        qc.invalidateQueries({ queryKey: cid ? ["messages", cid] : ["messages"] });
+      .on("postgres_changes", { event: "*", schema: "public", table: "conversations" }, (p) => {
+        if (p.eventType === "DELETE") {
+          const id = (p.old as Partial<Conversation>).id;
+          qc.setQueryData<Conversation[]>(["conversations"], (list) => list?.filter((c) => c.id !== id));
+          return;
+        }
+        const row = p.new as Conversation;
+        qc.setQueryData<Conversation[]>(["conversations"], (list) => {
+          if (!list) return list;
+          const next = list.some((c) => c.id === row.id) ? list.map((c) => (c.id === row.id ? row : c)) : [row, ...list];
+          return next.sort((a, b) => (b.last_message_at ?? "").localeCompare(a.last_message_at ?? ""));
+        });
       })
-      .subscribe();
+      .on("postgres_changes", { event: "*", schema: "public", table: "messages" }, (p) => {
+        if (p.eventType === "DELETE") return;
+        const row = p.new as Message;
+        qc.setQueryData<Message[]>(["messages", row.conversation_id], (list) => {
+          if (!list) return list; // not open: it loads fresh when opened
+          const rest = list.filter((m) => m.id !== row.id && !(m.id.startsWith("temp-") && row.sender === "humano" && m.body === row.body));
+          return [...rest, row].sort((a, b) => a.created_at.localeCompare(b.created_at));
+        });
+      })
+      .subscribe((status) => {
+        // After a reconnect, catch up on anything missed while disconnected.
+        if (status !== "SUBSCRIBED") return;
+        if (subscribedOnce) {
+          qc.invalidateQueries({ queryKey: ["conversations"] });
+          qc.invalidateQueries({ queryKey: ["messages"] });
+        }
+        subscribedOnce = true;
+      });
     const t = setInterval(() => tick((n) => n + 1), 30_000);
     return () => { supabase.removeChannel(ch); clearInterval(t); };
   }, [qc]);
@@ -192,9 +220,10 @@ function ConversationView({ conv }: { conv: Conversation }) {
   const msgs = useQuery({
     queryKey: ["messages", conv.id],
     queryFn: async () => {
-      const { data, error } = await supabase.from("messages").select("*").eq("conversation_id", conv.id).order("created_at", { ascending: true }).limit(500);
+      // The newest 300 messages (a long chat used to load its oldest ones instead).
+      const { data, error } = await supabase.from("messages").select("*").eq("conversation_id", conv.id).order("created_at", { ascending: false }).limit(300);
       if (error) throw error;
-      return data;
+      return data.reverse();
     },
   });
   useEffect(() => { bottom.current?.scrollIntoView({ block: "end" }); }, [msgs.data?.length]);
@@ -223,22 +252,33 @@ function ConversationView({ conv }: { conv: Conversation }) {
   async function setMode(mode: Mode) {
     const patch: Partial<Conversation> = { mode };
     if (mode === "ia") Object.assign(patch, { ai_replies: 0, handoff_reason: null, handoff_at: null });
+    // Show the change at once; undo it if the database refuses.
+    const before = qc.getQueryData<Conversation[]>(["conversations"]);
+    qc.setQueryData<Conversation[]>(["conversations"], (list) => list?.map((c) => (c.id === conv.id ? { ...c, ...patch } : c)));
     const { error } = await supabase.from("conversations").update(patch).eq("id", conv.id);
-    if (error) toast.error("Não foi possível atualizar", { description: error.message });
-    qc.invalidateQueries({ queryKey: ["conversations"] });
+    if (error) {
+      qc.setQueryData(["conversations"], before);
+      toast.error("Não foi possível atualizar", { description: error.message });
+    }
   }
 
   async function submit(e?: React.FormEvent) {
     e?.preventDefault();
-    if (!text.trim()) return;
+    const body = text.trim();
+    if (!body) return;
+    // The message shows up right away; the real row replaces it when it arrives.
+    const temp = { id: `temp-${Date.now()}`, conversation_id: conv.id, direction: "out", sender: "humano", body, status: "sending", created_at: new Date().toISOString() } as Message;
+    qc.setQueryData<Message[]>(["messages", conv.id], (list) => [...(list ?? []), temp]);
+    setText("");
     setSending(true);
     try {
-      await send({ data: { conversationId: conv.id, body: text } });
-      setText("");
-      qc.invalidateQueries({ queryKey: ["messages", conv.id] });
+      await send({ data: { conversationId: conv.id, body } });
     } catch (err) {
+      setText(body);
       toast.error(String((err as Error).message));
     } finally {
+      qc.setQueryData<Message[]>(["messages", conv.id], (list) => list?.filter((m) => m.id !== temp.id));
+      qc.invalidateQueries({ queryKey: ["messages", conv.id] });
       setSending(false);
     }
   }

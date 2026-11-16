@@ -5,11 +5,13 @@ export function useIsStaff() {
   return useQuery({
     queryKey: ["is-staff"],
     queryFn: async () => {
-      const { data: u } = await supabase.auth.getUser();
-      if (!u.user) return false;
-      const { data } = await supabase.from("user_roles").select("role").eq("user_id", u.user.id).eq("role", "staff").maybeSingle();
+      const { data: s } = await supabase.auth.getSession();
+      const user = s.session?.user;
+      if (!user) return false;
+      const { data } = await supabase.from("user_roles").select("role").eq("user_id", user.id).eq("role", "staff").maybeSingle();
       return !!data;
     },
+    staleTime: 10 * 60_000,
   });
 }
 

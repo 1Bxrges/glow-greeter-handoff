@@ -23,11 +23,15 @@ export const sendHumanReply = createServerFn({ method: "POST" })
       conversation_id: conv.id, direction: "out", sender: "humano", body: data.body, wa_message_id: sent.waMessageId, status: "accepted",
     });
     if (insErr) throw new Error(insErr.message);
-    await supabase.from("conversations").update({ mode: "humano", last_message_at: new Date().toISOString(), last_message_preview: data.body.slice(0, 140) }).eq("id", conv.id);
-    // Status callbacks that arrived before this row existed.
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const { applyStatuses } = await import("@/lib/webhook-processor.server");
-    await applyStatuses(supabaseAdmin, sent.waMessageId);
+    // Status callbacks that arrived before this row existed are applied at the same time.
+    const [{ supabaseAdmin }, { applyStatuses }] = await Promise.all([
+      import("@/integrations/supabase/client.server"),
+      import("@/lib/webhook-processor.server"),
+    ]);
+    await Promise.all([
+      supabase.from("conversations").update({ mode: "humano", last_message_at: new Date().toISOString(), last_message_preview: data.body.slice(0, 140) }).eq("id", conv.id),
+      applyStatuses(supabaseAdmin, sent.waMessageId),
+    ]);
     return { ok: true };
   });
 
