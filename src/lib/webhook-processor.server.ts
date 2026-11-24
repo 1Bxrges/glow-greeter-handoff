@@ -2,7 +2,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/integrations/supabase/types";
 import { runSecretary, type AiDecision } from "./ai-secretary.server";
-import { sendWhatsAppAudio, sendWhatsAppText, showTyping, type SendResult } from "./whatsapp.server";
+import { sendWhatsAppAudio, sendWhatsAppText, type SendResult } from "./whatsapp.server";
 import { aiAllowedFor } from "./rules/test-mode";
 
 type DB = SupabaseClient<Database>;
@@ -231,8 +231,9 @@ export async function processReply(db: DB, messageId: string) {
   const delayMs = Math.min(delaySeconds, MAX_INLINE_DELAY_SECONDS) * 1000;
   const waitMs = delayMs - (Date.now() - new Date(claimed.created_at).getTime());
   if (waitMs > 500) {
-    // Fire and forget: the "digitando…" call must never hold up the reply.
-    if (claimed.wa_message_id) void showTyping(claimed.wa_message_id);
+    // No "digitando…" here: WhatsApp only shows it together with marking the lead's message as
+    // read, and that also clears the unread badge in the clinic's WhatsApp Business app, so the
+    // doctor would not notice the chat when the AI hands it over.
     await sleep(waitMs);
     // Someone may have taken over while we waited.
     const { data: fresh, error: fErr } = await db.from("conversations").select("mode").eq("id", conv.id).single();
